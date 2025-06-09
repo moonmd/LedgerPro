@@ -1,0 +1,45 @@
+# docker-compose.yml for local development
+version: "3.8"
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./ledgerpro/frontend:/app # Mount local code for hot reloading
+      - /app/node_modules # Don't mount over node_modules
+      - /app/.next # Don't mount over .next
+    environment:
+      - NODE_ENV=development
+    # command: npm run dev # Already default in Next.js Dockerfile for dev
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ledgerpro/backend:/app # Mount local code for hot reloading (Django reloads on code change)
+    environment:
+      - DJANGO_SETTINGS_MODULE=ledgerpro_project.settings
+      # Add other environment variables like DB connection strings here or via .env file
+    # depends_on:
+      # - db # Uncomment when PostgreSQL service is added
+
+#  db: # Placeholder for PostgreSQL service
+#    image: postgres:16-alpine
+#    volumes:
+#      - postgres_data:/var/lib/postgresql/data/
+#    environment:
+#      - POSTGRES_DB=ledgerpro
+#      - POSTGRES_USER=ledgerpro
+#      - POSTGRES_PASSWORD=secret # Change this
+#    ports:
+#      - "5432:5432"
+
+# volumes: # Uncomment when PostgreSQL service is added
+#  postgres_data:
