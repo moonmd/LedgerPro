@@ -49,6 +49,43 @@ LedgerPro is built with a modern, scalable technology stack:
   - Stripe / PayPal (Payment Processing - planned)
   - TaxJar / AvaTax (Tax Calculation - planned)
 
+## Automated Development Setup Script (Recommended)
+
+For a quicker and more automated setup of your local development environment (especially when using Docker Compose), a bash script `setup_dev_env.sh` is provided in the project root.
+
+This script will:
+- Prompt you for necessary API keys and secrets (Plaid, SendGrid, Django Secret Key).
+- Create the `ledgerpro/backend/.env` file with your inputs and appropriate defaults for Docker.
+- Check for Docker and Docker Compose installations.
+- Optionally clean up any previous Docker environment for this project.
+- Build and start the Docker Compose services (backend, database, redis if configured).
+- Wait for the database service to be ready.
+- Run Django database migrations inside the backend container.
+- Optionally, prompt you to create a Django superuser interactively.
+- Provide final instructions on accessing the services.
+
+**How to use the script:**
+
+1.  **Ensure Prerequisites:** You still need Git, Docker, and Docker Compose installed.
+2.  **Clone the Repository:** (If you haven't already)
+    ```bash
+    git clone https://github.com/YOUR_USERNAME/YOUR_REPONAME.git # Replace
+    cd YOUR_REPONAME
+    ```
+3.  **Make the script executable:**
+    ```bash
+    chmod +x setup_dev_env.sh
+    ```
+4.  **Run the script:**
+    ```bash
+    ./setup_dev_env.sh
+    ```
+5.  **Follow the prompts.** The script will guide you through providing necessary configurations.
+
+After the script completes, your Dockerized backend environment should be up and running. You can then proceed to start the frontend development server separately if you wish (see "Frontend Setup" section below).
+
+Using this script is recommended over fully manual setup if you plan to use Docker Compose. The manual steps below are still useful for understanding the components or for setups not using Docker for all services.
+
 ## Local Development Setup
 
 This section guides you through setting up LedgerPro for local development and testing.
@@ -95,8 +132,7 @@ pip install -r requirements.txt
 The backend requires several environment variables for configuration. These are typically stored in a `.env` file in the `ledgerpro/backend` directory.
 
 1.  **Create a `.env` file** in `ledgerpro/backend/` by copying the example below:
-
-```env
+    ```env
 # ledgerpro/backend/.env
 # Django Settings
 DJANGO_SECRET_KEY='your_strong_secret_key_here' # Replace with a real secret key
@@ -124,8 +160,7 @@ DEFAULT_FROM_EMAIL='noreply@yourdomain.com' # Your default sending email
 
 # Allowed Hosts (for Django DEBUG=False)
 # ALLOWED_HOSTS='localhost,127.0.0.1,.yourproductiondomain.com'
-```
-
+    ```
 2.  **Important:** Replace placeholder values (like `your_strong_secret_key_here`, Plaid keys, SendGrid key) with your actual development keys.
     - For `DJANGO_SECRET_KEY`, you can generate one using Django's `get_random_secret_key()` or an online generator.
     - The `DATABASE_URL` provided is configured for the PostgreSQL service in the `docker-compose.yml` file. If you are not using Docker for PostgreSQL, adjust this URL accordingly.
