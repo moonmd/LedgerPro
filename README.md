@@ -95,7 +95,8 @@ pip install -r requirements.txt
 The backend requires several environment variables for configuration. These are typically stored in a `.env` file in the `ledgerpro/backend` directory.
 
 1.  **Create a `.env` file** in `ledgerpro/backend/` by copying the example below:
-    ```env
+
+```env
 # ledgerpro/backend/.env
 # Django Settings
 DJANGO_SECRET_KEY='your_strong_secret_key_here' # Replace with a real secret key
@@ -123,7 +124,8 @@ DEFAULT_FROM_EMAIL='noreply@yourdomain.com' # Your default sending email
 
 # Allowed Hosts (for Django DEBUG=False)
 # ALLOWED_HOSTS='localhost,127.0.0.1,.yourproductiondomain.com'
-    ```
+```
+
 2.  **Important:** Replace placeholder values (like `your_strong_secret_key_here`, Plaid keys, SendGrid key) with your actual development keys.
     - For `DJANGO_SECRET_KEY`, you can generate one using Django's `get_random_secret_key()` or an online generator.
     - The `DATABASE_URL` provided is configured for the PostgreSQL service in the `docker-compose.yml` file. If you are not using Docker for PostgreSQL, adjust this URL accordingly.
