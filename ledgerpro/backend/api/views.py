@@ -195,9 +195,17 @@ class PlaidCreateLinkTokenView(APIView):
         membership = user.membership_set.first()
         if not membership: return Response({'error': 'User not associated with an organization.'}, status=status.HTTP_400_BAD_REQUEST)
         organization = membership.organization
-        link_token = plaid_service.create_link_token(str(user.id), organization)
-        if link_token: return Response({'link_token': link_token})
-        return Response({'error': 'Failed to create Plaid link token.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        try:
+            link_token = plaid_service.create_link_token(str(user.id), organization)
+            if link_token:
+                return Response({'link_token': link_token})
+            else:
+                # This case means create_link_token handled the error logging internally and returned None.
+                return Response({'error': 'Failed to initialize Plaid link. Please check configuration or try again later.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            # This catches unexpected errors in the view itself or unhandled exceptions from the service.
+            logger.exception(f'Unexpected critical error in PlaidCreateLinkTokenView for user {user.id}, org {organization.name}:')
+            return Response({'error': 'An unexpected server error occurred.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 class PlaidExchangePublicTokenView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     def post(self, request, *args, **kwargs):

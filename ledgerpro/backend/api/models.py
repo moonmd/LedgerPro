@@ -7,6 +7,7 @@ import uuid
 from decimal import Decimal # Added for get_period_activity
 
 class Organization(models.Model):
+    '''Represents a business entity using LedgerPro.'''
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -385,6 +386,7 @@ class PayRun(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     processed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='processed_pay_runs')
     processed_at = models.DateTimeField(null=True, blank=True)
+    gl_transaction = models.ForeignKey(Transaction, on_delete=models.SET_NULL, null=True, blank=True, related_name='pay_run_source', help_text='Link to the General Ledger transaction for this pay run')
 
     class Meta:
         ordering = ['organization', '-payment_date']

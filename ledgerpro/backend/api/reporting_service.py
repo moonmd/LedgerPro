@@ -7,9 +7,25 @@ from datetime import date, timedelta # Added timedelta
 logger = logging.getLogger(__name__)
 
 def get_profit_and_loss_data(organization: Organization, date_from: date, date_to: date):
-    '''Generates data for Profit & Loss statement.'''
+    '''
+    Generates data for a Profit & Loss statement for a given organization and date range.
+
+    Args:
+        organization (Organization): The organization for which to generate the report.
+        date_from (date): The start date of the reporting period.
+        date_to (date): The end date of the reporting period.
+
+    Returns:
+        dict: A dictionary containing the P&L report data.
+
+    Raises:
+        ValueError: If date_from or date_to are not provided.
+    '''
     if not (date_from and date_to):
+        logger.error(f"P&L report generation failed for org {organization.id}: date_from or date_to not provided.")
         raise ValueError('Both date_from and date_to are required for P&L.')
+
+    logger.info(f"Generating P&L report for organization '{organization.name}' from {date_from} to {date_to}.")
 
     revenue_accounts = Account.objects.filter(organization=organization, type=Account.REVENUE, is_active=True)
     expense_accounts = Account.objects.filter(organization=organization, type=Account.EXPENSE, is_active=True)
