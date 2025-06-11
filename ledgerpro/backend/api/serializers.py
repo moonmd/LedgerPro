@@ -354,10 +354,14 @@ class PayslipSerializer(serializers.ModelSerializer):
         fields = ['id', 'pay_run', 'employee', 'gross_pay', 'total_deductions', 'net_pay', 'notes', 'created_at', 'deductions_applied']
         read_only_fields = fields
 
+class ManualDeductionInputSerializer(serializers.Serializer):
+    deduction_type_id = serializers.UUIDField(required=True)
+    amount = serializers.DecimalField(max_digits=19, decimal_places=2, required=True)
+
 class PayRunEmployeeInputSerializer(serializers.Serializer):
     employee_id = serializers.UUIDField()
     hours_worked = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True)
-    manual_deductions = serializers.ListField(child=serializers.DictField(children={'deduction_type_id': serializers.UUIDField(),'amount': serializers.DecimalField(max_digits=19, decimal_places=2)}), required=False, allow_empty=True)
+    manual_deductions = ManualDeductionInputSerializer(many=True, required=False, allow_empty=True)
 
 class PayRunSerializer(serializers.ModelSerializer):
     organization = serializers.PrimaryKeyRelatedField(read_only=True)
