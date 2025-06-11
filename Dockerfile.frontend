@@ -9,33 +9,56 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
+# Assumes Docker build context is the project root.
 COPY ledgerpro/frontend/package.json ledgerpro/frontend/package-lock.json* ledgerpro/frontend/npm-shrinkwrap.json* ledgerpro/frontend/pnpm-lock.yaml* ./
-RUN     if [ -f yarn.lock ]; then yarn --frozen-lockfile;     elif [ -f package-lock.json ]; then npm ci;     elif [ -f pnpm-lock.yaml ]; then yarn global add pnpm && pnpm i --frozen-lockfile;     else echo "Lockfile not found." && exit 1;     fi
+RUN \
+    if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
+    elif [ -f package-lock.json ]; then npm ci; \
+    elif [ -f pnpm-lock.yaml ]; then yarn global add pnpm && pnpm i --frozen-lockfile; \
+    else echo "Lockfile not found." && exit 1; \
+    fi
 
 # 2. Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY ledgerpro/frontend .
+COPY ledgerpro/frontend . # This copies source code from ledgerpro/frontend (relative to build context) into /app
 
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry
-# Uncomment the following line in case you want to disable telemetry during the build.
 ENV NEXT_TELEMETRY_DISABLED 1
 
-RUN     if [ -f yarn.lock ]; then yarn build;     elif [ -f package-lock.json ]; then npm run build;     elif [ -f pnpm-lock.yaml ]; then pnpm run build;     else echo "Lockfile not found." && exit 1;     fi
+RUN \
+    if [ -f yarn.lock ]; then yarn build; \
+    elif [ -f package-lock.json ]; then npm run build; \
+    elif [ -f pnpm-lock.yaml ]; then pnpm run build; \
+    else echo "Lockfile not found during build stage command execution." && exit 1; \
+    fi
+
+# --- ADDED DEBUGGING LINES ---
+RUN echo "DEBUG: Current directory after build: $(pwd)"
+RUN echo "DEBUG: Listing /app contents after build:" && ls -Al /app
+RUN echo "DEBUG: Listing /app/.next contents after build:" && ls -Al /app/.next || echo "DEBUG: /app/.next directory NOT FOUND after build"
+RUN echo "DEBUG: Listing /app/.next/standalone contents after build (if it exists):" && ls -Al /app/.next/standalone || echo "DEBUG: /app/.next/standalone directory NOT FOUND after build"
+RUN echo "DEBUG: Listing /app/public contents after build (if it exists):" && ls -Al /app/public || echo "DEBUG: /app/public directory NOT FOUND after build"
+
+# Add a hard exit if standalone is missing to ensure we see these logs before the COPY fails later
+RUN if [ ! -d "/app/.next/standalone" ]; then echo "CRITICAL ERROR (Dockerfile debug): /app/.next/standalone was not created by the build." && exit 1; fi
+# Also check for public, though standalone is often the main one for this copy pattern
+RUN if [ ! -d "/app/public" ]; then echo "CRITICAL ERROR (Dockerfile debug): /app/public was not found after the build. Ensure ledgerpro/frontend/public exists in source and is copied." && exit 1; fi
+# --- END OF DEBUGGING LINES ---
 
 # 3. Production image, copy all the files and run next
 FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV production
-# Uncomment the following line in case you want to disable telemetry during runtime.
 ENV NEXT_TELEMETRY_DISABLED 1
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# This COPY relies on /app/public existing in the builder stage
 COPY --from=builder /app/public ./public
 
 # Set the correct permission for prerender cache
@@ -43,14 +66,13 @@ RUN mkdir .next
 RUN chown nextjs:nodejs .next
 
 # Automatically leverage output traces to reduce image size
-# https://nextjs.org/docs/advanced-features/output-file-tracing
+# These COPY commands rely on /app/.next/standalone and /app/.next/static existing in builder
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
 
 EXPOSE 3000
-
 ENV PORT 3000
 
 CMD ["node", "server.js"]
