@@ -137,7 +137,7 @@ pip install -r requirements.txt
 The backend requires several environment variables for configuration. These are typically stored in a `.env` file in the `ledgerpro/backend` directory.
 
 1.  **Create a `.env` file** in `ledgerpro/backend/` by copying the example below:
-    ```env
+```env
 # ledgerpro/backend/.env
 # Django Settings
 DJANGO_SECRET_KEY='your_strong_secret_key_here' # Replace with a real secret key
@@ -145,12 +145,12 @@ DEBUG=True
 
 # Database (PostgreSQL - for local Docker setup or external DB)
 # If using local Docker Compose setup (see docker-compose.yml):
-DATABASE_URL='postgres://ledgerpro:secret@localhost:5432/ledgerpro'
+DATABASE_URL='postgres://ledgerpro:secret@db:5432/ledgerpro'
 # If using SQLite for very basic local testing (not recommended for full features):
 # DATABASE_URL='sqlite:///./db.sqlite3'
 
 # Redis (for Celery, Caching - if using local Docker setup or external Redis)
-REDIS_URL='redis://localhost:6379/0'
+REDIS_URL='redis://localhost:6379/0' # Or redis://redis:6379/0 if using Docker Compose for Redis
 
 # Plaid API Keys (obtain from Plaid dashboard)
 PLAID_CLIENT_ID='your_plaid_client_id'
@@ -165,7 +165,7 @@ DEFAULT_FROM_EMAIL='noreply@yourdomain.com' # Your default sending email
 
 # Allowed Hosts (for Django DEBUG=False)
 # ALLOWED_HOSTS='localhost,127.0.0.1,.yourproductiondomain.com'
-    ```
+```
 2.  **Important:** Replace placeholder values (like `your_strong_secret_key_here`, Plaid keys, SendGrid key) with your actual development keys.
     - For `DJANGO_SECRET_KEY`, you can generate one using Django's `get_random_secret_key()` or an online generator.
     - The `DATABASE_URL` provided is configured for the PostgreSQL service in the `docker-compose.yml` file. If you are not using Docker for PostgreSQL, adjust this URL accordingly.
@@ -533,5 +533,10 @@ If the `docker compose up --build` command fails during the frontend build stage
     2.  **Crucially, commit the generated `package-lock.json` (or equivalent lockfile) to your Git repository.**
     3.  The `setup_dev_env.sh` script now attempts to automate this generation if the lockfile is missing. If it still fails, refer to the "Troubleshooting `package-lock.json` Generation" notes within the "Frontend Setup" section of this README.
     4.  Once the lockfile is present in your local `ledgerpro/frontend` directory (and ideally committed), try running `docker compose up --build` again.
+
+### 6. Frontend Build Fails: CSS Syntax Error (e.g., "Unknown word" in CSS file)
+
+-   **Cause:** Standard CSS uses `/* ... */` for block comments. Single-line comments like `// ...` are not standard CSS and may cause errors with CSS parsers used in the build process (e.g., PostCSS).
+-   **Solution:** Ensure all CSS files (like `globals.css`, component styles, etc.) use the standard `/* ... */` comment syntax. Avoid using `//` for comments in `.css` files.
 
 [end of README.md]
