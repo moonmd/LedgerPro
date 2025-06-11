@@ -83,17 +83,15 @@ fi
 
 # --- End of User Inputs (for this step) ---
 
-# (Script will continue in next steps to create .env file and run docker-compose commands)
-
 echo "User input collection complete. Next steps will configure .env and Docker."
 
 # --- .env File Configuration ---
 echo "Configuring backend .env file at ledgerpro/backend/.env..."
 
 # Ensure backend directory exists (it should, but good practice)
-mkdir -p "ledgerpro/backend"
+mkdir -p "ledgerpro/backend" # BACKEND_DIR definition used here
 
-ENV_FILE="ledgerpro/backend/.env"
+ENV_FILE="ledgerpro/backend/.env" #Matches definition in prompt
 OVERWRITE_ENV=false
 if [ -f "${ENV_FILE}" ]; then
     echo "Found existing .env file at ${ENV_FILE}."
@@ -106,10 +104,8 @@ if [ -f "${ENV_FILE}" ]; then
     fi
 fi
 
-# Create .env file if it doesn't exist or if user chose to overwrite
 if [ ! -f "${ENV_FILE}" ] || [ "${OVERWRITE_ENV}" = true ]; then
     echo "Creating/Overwriting ${ENV_FILE}..."
-    # Use a temporary file to build .env content, then move, to avoid partial writes on error
     TEMP_ENV_FILE=$(mktemp)
 
     echo "# Django Settings" > "${TEMP_ENV_FILE}"
@@ -138,7 +134,6 @@ if [ ! -f "${ENV_FILE}" ] || [ "${OVERWRITE_ENV}" = true ]; then
     echo "DEFAULT_FROM_EMAIL='${DEFAULT_FROM_EMAIL}'" >> "${TEMP_ENV_FILE}"
 
     echo "" >> "${TEMP_ENV_FILE}"
-    # Move the temp file to the actual .env file location
     mv "${TEMP_ENV_FILE}" "${ENV_FILE}"
     if [ $? -eq 0 ]; then
         echo "${ENV_FILE} created successfully."
@@ -149,61 +144,86 @@ else
     echo "Using existing ${ENV_FILE}. Ensure it's correctly configured for Docker Compose (e.g., DATABASE_URL uses 'db' as hostname)."
 fi
 
-# (Script will continue with Docker Compose commands in the next step)
-
 # --- Docker Compose & Initial Backend Setup ---
 echo "Proceeding with Docker Compose setup..."
 
-# Check for Docker and Docker Compose
-if ! command -v docker &> /dev/null; then
-    echo "Error: Docker is not installed. Please install Docker to continue." >&2
+# Determine Docker Compose command
+DC_COMMAND=""
+if command -v docker && docker compose version &> /dev/null; then
+    echo "Found Docker Compose V2 (docker compose)."
+    DC_COMMAND="docker compose"
+elif command -v docker-compose &> /dev/null; then
+    echo "Found Docker Compose V1 (docker-compose)."
+    DC_COMMAND="docker-compose"
+else
+    echo "Error: Docker Compose (neither 'docker compose' V2 nor 'docker-compose' V1) is not installed or not in PATH." >&2
+    echo "Please install Docker and Docker Compose to continue." >&2
     exit 1
 fi
-if ! command -v docker-compose &> /dev/null; then
-    echo "Error: Docker Compose is not installed. Please install Docker Compose to continue." >&2
+
+# Basic Docker daemon connectivity test
+echo "Testing basic Docker daemon connectivity..."
+if ! docker info > /dev/null 2>&1; then
+    echo "Error: Could not connect to Docker daemon. Is Docker running?" >&2
     exit 1
 fi
-echo "Docker and Docker Compose found."
+echo "Docker daemon is responsive."
 
 # Optional: Clean previous Docker environment
 read -p "Do you want to stop and remove existing Docker containers and volumes (if any) for this project? (y/n) [n]: " choice_clean_docker
 if [[ "${choice_clean_docker,,}" == "y" || "${choice_clean_docker,,}" == "yes" ]]; then
-    echo "Stopping and removing existing Docker environment (including database data)..."
-    docker-compose down -v
+    echo "Stopping and removing existing Docker environment (including database data) using ${DC_COMMAND}..."
+    ${DC_COMMAND} down -v
     if [ $? -ne 0 ]; then
-        echo "Warning: 'docker-compose down -v' encountered an issue. This might be okay if no services were running."
+        echo "Warning: '${DC_COMMAND} down -v' encountered an issue. This might be okay if no services were running."
     fi
 else
     echo "Skipping cleanup of existing Docker environment."
 fi
 
 # Ensure Redis is in docker-compose.yml if REDIS_URL is set to use 'redis' host
-if grep -q "REDIS_URL='redis://redis" "${ENV_FILE}"; then
+# Define BACKEND_DIR for this check, consistent with how ENV_FILE was used.
+BACKEND_DIR="ledgerpro/backend"
+ENV_FILE_PATH="${BACKEND_DIR}/.env"
+if [ -f "${ENV_FILE_PATH}" ] && grep -q "REDIS_URL='redis://redis" "${ENV_FILE_PATH}"; then
     if ! grep -q "redis:" "docker-compose.yml"; then
         echo "Warning: REDIS_URL in .env points to 'redis' host, but no 'redis' service found in docker-compose.yml."
         echo "You might need to uncomment or add a Redis service to your docker-compose.yml for Celery/Caching to work."
     fi
 fi
 
-echo "Building and starting Docker services in detached mode (docker-compose up --build -d)..."
-docker-compose up --build -d
-if [ $? -ne 0 ]; then
-    echo "Error: Docker Compose failed to start services. Check logs above." >&2
+echo "Building and starting Docker services in detached mode (${DC_COMMAND} up --build -d)..."
+UP_OUTPUT_FILE=$(mktemp)
+if ! ${DC_COMMAND} up --build -d > "${UP_OUTPUT_FILE}" 2>&1; then
+    echo "Error: Docker Compose failed to start services. See details below:" >&2
+    cat "${UP_OUTPUT_FILE}" >&2
+    if grep -q -E "URLSchemeUnknown|http\+docker" "${UP_OUTPUT_FILE}"; then
+        echo "-----------------------------------------------------------------------" >&2
+        echo "Specific Troubleshooting for 'URLSchemeUnknown' or 'http+docker' error:" >&2
+        echo "This error can occur with older docker-compose (V1) versions if the Docker environment is unusual." >&2
+        echo "1. Check DOCKER_HOST: Ensure the DOCKER_HOST environment variable is unset or correctly configured." >&2
+        echo "   Run: echo \$DOCKER_HOST" >&2
+        echo "2. Check Docker Context: Ensure your current Docker context is standard." >&2
+        echo "   Run: docker context ls" >&2
+        echo "3. If using docker-compose V1 (Python script), this might be an issue with its Python environment or dependencies." >&2
+        echo "   Consider using Docker Compose V2 ('docker compose') if available, which is generally more robust." >&2
+        echo "-----------------------------------------------------------------------" >&2
+    fi
+    rm "${UP_OUTPUT_FILE}"
     exit 1
 fi
+rm "${UP_OUTPUT_FILE}"
 echo "Docker services started."
 
 # Wait for services to be ready (especially PostgreSQL)
 echo "Waiting for backend and database services to initialize (approx. 15-30 seconds)..."
 sleep 15 # Initial sleep
 
-# Basic check for PostgreSQL readiness (conceptual, might need refinement)
-# This tries to connect to the DB using psql inside the backend container.
 MAX_DB_RETRIES=5
 DB_RETRY_COUNT=0
 DB_READY=false
 until [ "$DB_READY" = true ] || [ "$DB_RETRY_COUNT" -ge "$MAX_DB_RETRIES" ]; do
-    if docker-compose exec -T backend pg_isready -h db -p 5432 -U ledgerpro -d ledgerpro -q; then
+    if ${DC_COMMAND} exec -T backend pg_isready -h db -p 5432 -U ledgerpro -d ledgerpro -q; then
         echo "PostgreSQL database is ready."
         DB_READY=true
     else
@@ -214,16 +234,14 @@ until [ "$DB_READY" = true ] || [ "$DB_RETRY_COUNT" -ge "$MAX_DB_RETRIES" ]; do
 done
 
 if [ "$DB_READY" = false ]; then
-    echo "Error: Database service did not become ready. Check Docker logs: docker-compose logs db" >&2
+    echo "Error: Database service did not become ready. Check Docker logs: ${DC_COMMAND} logs db" >&2
     echo "You may need to wait longer and then manually run migrations and superuser creation."
-    # exit 1 # Decide if script should exit or continue with a warning
 fi
 
 echo "Running Django database migrations inside the backend container..."
-docker-compose exec backend python manage.py migrate
+${DC_COMMAND} exec backend python manage.py migrate
 if [ $? -ne 0 ]; then
-    echo "Error: Database migrations failed. Check logs above and Docker container logs: docker-compose logs backend" >&2
-    # exit 1
+    echo "Error: Database migrations failed. Check logs above and Docker container logs: ${DC_COMMAND} logs backend" >&2
 fi
 echo "Database migrations completed."
 
@@ -232,7 +250,7 @@ read -p "Do you want to create a Django superuser now? (y/n) [y]: " choice_super
 if [[ "${choice_superuser,,}" == "y" || "${choice_superuser,,}" == "yes" || -z "${choice_superuser}" ]]; then
     echo "Creating Django superuser (this will be interactive)..."
     echo "Please follow the prompts to set username, email (optional), and password."
-    docker-compose exec backend python manage.py createsuperuser
+    ${DC_COMMAND} exec backend python manage.py createsuperuser
     if [ $? -ne 0 ]; then
         echo "Warning: Superuser creation might have been skipped or encountered an issue."
     else
@@ -240,10 +258,8 @@ if [[ "${choice_superuser,,}" == "y" || "${choice_superuser,,}" == "yes" || -z "
     fi
 else
     echo "Skipping superuser creation. You can create one later with:"
-    echo "  docker-compose exec backend python manage.py createsuperuser"
+    echo "  ${DC_COMMAND} exec backend python manage.py createsuperuser"
 fi
-
-# (Script will continue with final instructions and README update in the next step)
 
 # --- Setup Complete - Next Steps ---
 echo ""
@@ -266,12 +282,12 @@ echo "    npm run dev"
 echo "  The frontend will typically be available at http://localhost:3000"
 echo ""
 echo "To stop the Docker Compose services:"
-echo "  Run 'docker-compose down' in the project root directory."
-echo "  To also remove data volumes (e.g., database data): 'docker-compose down -v'"
+echo "  Run '${DC_COMMAND} down' in the project root directory." # Use determined DC_COMMAND
+echo "  To also remove data volumes (e.g., database data): '${DC_COMMAND} down -v'"
 echo ""
 echo "To view logs for running services:"
-echo "  'docker-compose logs -f' (for all services, streaming)"
-echo "  'docker-compose logs backend' (for just the backend service)"
+echo "  '${DC_COMMAND} logs -f' (for all services, streaming)"
+echo "  '${DC_COMMAND} logs backend' (for just the backend service)"
 echo ""
 echo "Remember to make this script executable if you haven't: chmod +x setup_dev_env.sh"
 echo ""

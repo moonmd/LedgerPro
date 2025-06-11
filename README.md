@@ -132,7 +132,7 @@ pip install -r requirements.txt
 The backend requires several environment variables for configuration. These are typically stored in a `.env` file in the `ledgerpro/backend` directory.
 
 1.  **Create a `.env` file** in `ledgerpro/backend/` by copying the example below:
-```env
+    ```env
 # ledgerpro/backend/.env
 # Django Settings
 DJANGO_SECRET_KEY='your_strong_secret_key_here' # Replace with a real secret key
@@ -160,8 +160,7 @@ DEFAULT_FROM_EMAIL='noreply@yourdomain.com' # Your default sending email
 
 # Allowed Hosts (for Django DEBUG=False)
 # ALLOWED_HOSTS='localhost,127.0.0.1,.yourproductiondomain.com'
-```
-
+    ```
 2.  **Important:** Replace placeholder values (like `your_strong_secret_key_here`, Plaid keys, SendGrid key) with your actual development keys.
     - For `DJANGO_SECRET_KEY`, you can generate one using Django's `get_random_secret_key()` or an online generator.
     - The `DATABASE_URL` provided is configured for the PostgreSQL service in the `docker-compose.yml` file. If you are not using Docker for PostgreSQL, adjust this URL accordingly.
@@ -258,54 +257,88 @@ REDIS_URL='redis://redis:6379/0'
 ```
 **Note the hostname `redis`**.
 
+#### c. Determine Your Docker Compose Command
 
-#### c. Build and Run Services with Docker Compose
+LedgerPro supports both Docker Compose V2 (`docker compose`) and V1 (`docker-compose`).
+- **Docker Compose V2** is the current standard, typically included with Docker Desktop, and invoked as `docker compose` (with a space). It's generally recommended.
+- **Docker Compose V1** is the older, Python-based version, invoked as `docker-compose` (with a hyphen).
+
+The automated `./setup_dev_env.sh` script will attempt to detect and use V2 if available, otherwise V1.
+If running commands manually, please determine which version you have installed:
+```bash
+# Check for V2
+docker compose version
+# Check for V1
+docker-compose --version
+```
+Use the command that works for your system in the examples below. We will use `[docker compose command]` as a placeholder.
+
+#### d. Build and Run Services with Docker Compose
 
 From the **project root directory** (where `docker-compose.yml` is located):
 ```bash
 # Build the images and start the services
-docker-compose up --build
+# Using V2:
+docker compose up --build
+# Or using V1:
+# docker-compose up --build
 
 # To run in detached mode (in the background):
+# Using V2:
+docker compose up --build -d
+# Or using V1:
 # docker-compose up --build -d
 ```
-
 This command will:
 - Build the Docker images for the `frontend` and `backend` services if they don't exist or if their Dockerfiles have changed.
 - Start all services defined in `docker-compose.yml`.
 - You will see logs from all services in your terminal (unless using detached mode).
 
-#### d. Initial Setup (First time running with Docker Compose)
+#### e. Initial Setup (First time running with Docker Compose)
 
 If this is the first time you are running the stack with Docker Compose, or after a database reset, you'll need to run database migrations and potentially create a superuser **inside the running backend container**.
 
 1.  **Open a new terminal window.**
-2.  **Find the name of your running backend container:**
+2.  **Find the name of your running backend container (usually `ledgerpro-backend-1` or similar if using default project name from compose file, or `yourprojectname_backend_1`):**
     ```bash
-    docker-compose ps
+    # Using V2:
+    docker compose ps
+    # Or using V1:
+    # docker-compose ps
     ```
-    Look for the service named similar to `yourprojectname_backend_1` (the exact name might vary).
 3.  **Execute commands inside the backend container:**
     ```bash
-    # Replace 'yourprojectname_backend_1' with your actual container name/ID
-    docker-compose exec backend python manage.py makemigrations api
-    docker-compose exec backend python manage.py migrate
-    docker-compose exec backend python manage.py createsuperuser
+    # Replace 'ledgerpro-backend-1' with your actual container name/ID if different.
+    # Using V2:
+    docker compose exec backend python manage.py makemigrations api
+    docker compose exec backend python manage.py migrate
+    docker compose exec backend python manage.py createsuperuser
+
+    # Or using V1:
+    # docker-compose exec backend python manage.py makemigrations api
+    # docker-compose exec backend python manage.py migrate
+    # docker-compose exec backend python manage.py createsuperuser
     ```
 
-#### e. Accessing Services
+#### f. Accessing Services
 
 - **Backend API:** Should be accessible at `http://localhost:8000` (as mapped in `docker-compose.yml`).
 - **Frontend (if run via Docker Compose):** Should be accessible at `http://localhost:3000`.
 - **PostgreSQL Database:** Accessible to the backend service at `db:5432`. If you need to connect from your host machine (e.g., with a DB tool), it's usually mapped to `localhost:5432` (check `ports` in `docker-compose.yml` for the `db` service).
 
-#### f. Stopping Docker Compose Services
+#### g. Stopping Docker Compose Services
 ```bash
 # If running in the foreground, press Ctrl+C in the terminal.
 # If running in detached mode, or from another terminal:
-docker-compose down
+# Using V2:
+docker compose down
+# Or using V1:
+# docker-compose down
 
 # To stop and remove volumes (e.g., to reset the database):
+# Using V2:
+docker compose down -v
+# Or using V1:
 # docker-compose down -v
 ```
 
@@ -426,5 +459,42 @@ While detailed performance tuning is application-specific and an ongoing process
 - **Static Asset Serving:** Serve static files and media efficiently, preferably via a CDN as mentioned in the Cloud Installation section.
 
 - **Load Testing:** For production systems, perform load testing to identify bottlenecks under stress.
+
+## Troubleshooting Docker Issues
+
+Common issues when setting up or running with Docker/Docker Compose:
+
+### 1. "Not supported URL scheme http+docker" or "URLSchemeUnknown"
+
+This error typically occurs when using `docker-compose` (V1, the Python script) and it cannot correctly determine how to connect to the Docker daemon.
+Suggestions:
+- **Use Docker Compose V2:** If available, prefer using `docker compose` (with a space). It's generally more robust. The `./setup_dev_env.sh` script attempts to do this.
+- **Check `DOCKER_HOST` Environment Variable:**
+  - In most local setups, this variable should be **unset**. If it's set (e.g., `echo $DOCKER_HOST`), try unsetting it: `unset DOCKER_HOST` and try again.
+  - If you need it set for other reasons, ensure it's a valid URI that your Docker client version supports (e.g., `unix:///var/run/docker.sock` on Linux).
+- **Check Docker Context:**
+  - List your Docker contexts: `docker context ls`
+  - Show your current context: `docker context show`
+  - Ensure the current context is correctly configured for your local Docker daemon (often the 'default' context).
+- **Docker Daemon Status:** Ensure your Docker daemon is running and responsive. Try `docker ps` or `docker info`.
+- **`docker-compose` V1 Environment:** If you must use `docker-compose` V1, this error can sometimes be due to issues in its Python environment or outdated dependencies (`docker` Python library, `requests`, `urllib3`). Consider reinstalling or updating `docker-compose` or its dependencies in a dedicated Python environment.
+
+### 2. Port Conflicts
+
+If you see errors like "port is already allocated" or "address already in use":
+- Another service on your machine is using a port that Docker Compose is trying to use (e.g., 8000 for backend, 3000 for frontend, 5432 for PostgreSQL).
+- Stop the conflicting service or change the port mapping in the `ports` section of your `docker-compose.yml` file (e.g., change `"8000:8000"` to `"8001:8000"` to map container port 8000 to host port 8001).
+
+### 3. Database Connection Issues from Backend Container
+
+- Ensure the `DATABASE_URL` in `ledgerpro/backend/.env` uses the correct service name for the database host (e.g., `db` as defined in `docker-compose.yml`, not `localhost`). Example: `postgres://ledgerpro:secret@db:5432/ledgerpro`.
+- Check logs of the database container (`docker compose logs db` or `docker-compose logs db`) for any errors during its startup.
+- Ensure the database service is fully up and running before the backend tries to connect (the setup script has a basic wait, but complex setups might need more).
+
+### 4. General Docker Issues
+
+- **Permissions:** On Linux, you might need to run Docker commands with `sudo` or add your user to the `docker` group (`sudo usermod -aG docker $USER` then log out/in).
+- **Disk Space:** Ensure you have enough free disk space for Docker images and volumes.
+- **Firewall:** Check if a firewall is blocking communication to/from Docker containers or the Docker daemon.
 
 [end of README.md]
