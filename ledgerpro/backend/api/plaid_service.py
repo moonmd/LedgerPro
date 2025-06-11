@@ -1,5 +1,5 @@
 import os
-from plaid import Client as PlaidClient, ApiException as PlaidApiException
+from plaid import ApiException as PlaidApiException # Corrected import
 from plaid.api import plaid_api
 from plaid.model.link_token_create_request import LinkTokenCreateRequest
 from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
