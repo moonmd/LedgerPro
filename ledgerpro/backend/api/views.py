@@ -12,7 +12,7 @@ from .serializers import (
     PlaidItemSerializer, StagedBankTransactionSerializer, ReconciliationRuleSerializer,
     EmployeeSerializer, PayRunSerializer, PayslipSerializer, DeductionTypeSerializer # Added Payroll serializers
 )
-from rest_framework import generics, permissions, status, viewsets # Added viewsets
+from rest_framework import generics, permissions, status, viewsets
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
@@ -26,13 +26,13 @@ import io
 from . import plaid_service
 from . import reconciliation_service
 from . import reporting_service
-from . import payroll_service # Added payroll_service
+from . import payroll_service
+from . import email_utils # Ensured email_utils is imported
 from datetime import date
 
 logger = logging.getLogger(__name__)
 
 # --- Existing User, Role, Mixin, Accounting, Customer, Invoice, Vendor, Plaid, StagedTx, Reconciliation, Reporting Views ---
-# (Assuming all previous views are here and correctly defined)
 class UserRegistrationView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserRegistrationSerializer
@@ -152,34 +152,49 @@ class InvoiceViewSet(OrganizationScopedViewMixin, generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
     def get_queryset(self):
         return super().get_queryset().order_by('-issue_date')
-class InvoiceDetailView(OrganizationScopedViewMixin, generics.RetrieveUpdateDestroyAPIView):
+
+class InvoiceDetailView(OrganizationScopedViewMixin, generics.RetrieveUpdateDestroyAPIView): # send_invoice_email action removed
     queryset = Invoice.objects.all().select_related('customer').prefetch_related('items')
     serializer_class = InvoiceSerializer
     permission_classes = [permissions.IsAuthenticated]
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
-    def send_invoice_email(self, request, pk=None):
+
+    def perform_destroy(self, instance):
+        AuditLog.objects.create(organization=instance.organization, user=self.request.user,action='deleted_invoice',details={'invoice_id': str(instance.id), 'invoice_number': instance.invoice_number})
+        instance.delete()
+
+# NEW VIEW FOR SENDING INVOICE EMAIL
+class InvoiceSendEmailView(OrganizationScopedViewMixin, generics.GenericAPIView):
+    queryset = Invoice.objects.all()
+    serializer_class = InvoiceSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
         invoice = self.get_object()
         if invoice.status == Invoice.PAID or invoice.status == Invoice.VOID:
             return Response({'error': f'Invoice in {invoice.status} status cannot be sent.'}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
-            from .email_utils import send_invoice_email as send_email_util
-            email_sent_successfully = send_email_util(invoice)
+            email_sent_successfully = email_utils.send_invoice_email(invoice)
             if email_sent_successfully:
                 if invoice.status == Invoice.DRAFT:
                     invoice.status = Invoice.SENT
                     invoice.save(update_fields=['status'])
-                AuditLog.objects.create(organization=invoice.organization, user=request.user,action='sent_invoice_email',details={'invoice_id': str(invoice.id), 'invoice_number': invoice.invoice_number, 'customer_email': invoice.customer.email})
+
+                AuditLog.objects.create(
+                    organization=invoice.organization,
+                    user=request.user,
+                    action='sent_invoice_email',
+                    details={'invoice_id': str(invoice.id), 'invoice_number': invoice.invoice_number, 'customer_email': invoice.customer.email}
+                )
                 return Response({'message': 'Invoice sent successfully.'}, status=status.HTTP_200_OK)
             else:
                 if not invoice.customer.email:
-                     return Response({'error': f'Customer {invoice.customer.name} has no email address. Invoice not sent.'}, status=status.HTTP_400_BAD_REQUEST)
-                return Response({'error': 'Failed to send invoice email.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    return Response({'error': f'Cannot send email: Customer {invoice.customer.name} has no email address.'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Failed to send invoice email. Possible configuration issue or SendGrid error.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
-            logger.error(f'Error in send_invoice_email view for invoice {invoice.id}: {str(e)}')
+            logger.exception(f'Error in InvoiceSendEmailView for invoice {invoice.id}: {e}')
             return Response({'error': 'An unexpected error occurred while sending the email.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    def perform_destroy(self, instance):
-        AuditLog.objects.create(organization=instance.organization, user=self.request.user,action='deleted_invoice',details={'invoice_id': str(instance.id), 'invoice_number': instance.invoice_number})
-        instance.delete()
+
 class VendorViewSet(OrganizationScopedViewMixin, generics.ListCreateAPIView):
     queryset = Vendor.objects.all()
     serializer_class = VendorSerializer
@@ -200,10 +215,8 @@ class PlaidCreateLinkTokenView(APIView):
             if link_token:
                 return Response({'link_token': link_token})
             else:
-                # This case means create_link_token handled the error logging internally and returned None.
                 return Response({'error': 'Failed to initialize Plaid link. Please check configuration or try again later.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
-            # This catches unexpected errors in the view itself or unhandled exceptions from the service.
             logger.exception(f'Unexpected critical error in PlaidCreateLinkTokenView for user {user.id}, org {organization.name}:')
             return Response({'error': 'An unexpected server error occurred.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 class PlaidExchangePublicTokenView(APIView):
@@ -387,11 +400,6 @@ class PayRunViewSet(OrganizationScopedViewMixin, viewsets.ModelViewSet):
         pay_run = self.get_object()
         employee_inputs_data = request.data.get('employee_inputs_for_processing', [])
 
-        # Assuming PayRunEmployeeInputSerializer is defined correctly for this structure
-        # from .serializers import PayRunEmployeeInputSerializer # Ensure this is available
-        # For this action, direct validation or use of the PayRunSerializer's employee_inputs_for_processing field
-        # is complex if not a standard create/update. Let's assume data is directly usable by service.
-
         try:
             processed_pay_run = payroll_service.process_pay_run(pay_run, employee_inputs_data, request.user)
             return Response(PayRunSerializer(processed_pay_run, context=self.get_serializer_context()).data)
@@ -411,12 +419,6 @@ class PayslipListView(OrganizationScopedViewMixin, generics.ListAPIView):
         employee_id_param = self.request.query_params.get('employee_id')
         if employee_id_param:
             qs = qs.filter(employee_id=employee_id_param)
-        # Add logic here if non-managers should only see their own payslips
-        # elif not self.request.user.is_staff: # Example, refine with proper role check
-        #    if hasattr(self.request.user, 'employee_profile'):
-        #        qs = qs.filter(employee=self.request.user.employee_profile)
-        #    else:
-        #        qs = Payslip.objects.none() # No profile, no payslips
         return qs.order_by('-pay_run__payment_date')
 
 
@@ -425,3 +427,5 @@ class PayslipDetailView(OrganizationScopedViewMixin, generics.RetrieveAPIView):
     permission_classes = [permissions.IsAuthenticated]
     def get_queryset(self):
          return Payslip.objects.filter(pay_run__organization=self.get_organization())
+
+[end of ledgerpro/backend/api/views.py]

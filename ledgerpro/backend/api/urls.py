@@ -13,6 +13,7 @@ from .views import (
     ReconciliationRuleViewSet, ReconciliationRuleDetailView, ApplyReconciliationRulesView,
     StagedBankTransactionDetailView,
     ProfitAndLossView, BalanceSheetView,
+    InvoiceSendEmailView, # Added for send email action
     # Payroll Views
     EmployeeViewSet, DeductionTypeViewSet, PayRunViewSet, PayslipListView, PayslipDetailView
 )
@@ -50,7 +51,7 @@ urlpatterns = [
     path('customers/<uuid:pk>/', CustomerDetailView.as_view(), name='customer-detail'),
     path('invoices/', InvoiceViewSet.as_view(), name='invoice-list-create'),
     path('invoices/<uuid:pk>/', InvoiceDetailView.as_view(), name='invoice-detail'), # Handles GET, PUT, DELETE for InvoiceDetailView
-    path('invoices/<uuid:pk>/send-email/', InvoiceDetailView.as_view({'post': 'send_invoice_email'}), name='invoice-send-email'), # Custom action
+    path('invoices/<uuid:pk>/send-email/', InvoiceSendEmailView.as_view(), name='invoice-send-email'), # Corrected to use InvoiceSendEmailView
     path('vendors/', VendorViewSet.as_view(), name='vendor-list-create'),
     path('vendors/<uuid:pk>/', VendorDetailView.as_view(), name='vendor-detail'),
 
