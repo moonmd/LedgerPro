@@ -150,27 +150,51 @@ echo "Checking frontend dependencies and lockfile..."
 
 FRONTEND_DIR="ledgerpro/frontend"
 PACKAGE_JSON="${FRONTEND_DIR}/package.json"
-LOCKFILE_NPM="${FRONTEND_DIR}/package-lock.json"
+EXPECTED_LOCKFILE_NPM="${FRONTEND_DIR}/package-lock.json"
+ROOT_LOCKFILE_NPM="./package-lock.json"
 LOCKFILE_YARN="${FRONTEND_DIR}/yarn.lock"
 LOCKFILE_PNPM="${FRONTEND_DIR}/pnpm-lock.yaml"
+NEEDS_LOCKFILE_GENERATION=true
 
-if [ -f "${LOCKFILE_NPM}" ]; then
-    echo "Found ${LOCKFILE_NPM}. This will be used for the Docker frontend build."
+if [ -f "${EXPECTED_LOCKFILE_NPM}" ]; then
+    echo "Found ${EXPECTED_LOCKFILE_NPM}. This will be used for the Docker frontend build."
+    NEEDS_LOCKFILE_GENERATION=false
 elif [ -f "${LOCKFILE_YARN}" ] || [ -f "${LOCKFILE_PNPM}" ]; then
-    echo "Found a non-npm lockfile (${LOCKFILE_YARN} or ${LOCKFILE_PNPM})."
+    echo "Found a non-npm lockfile (${LOCKFILE_YARN} or ${LOCKFILE_PNPM}) in ${FRONTEND_DIR}."
     echo "The Dockerfile.frontend is currently configured for npm (package-lock.json and 'npm ci')."
     echo "If this project uses yarn or pnpm, Dockerfile.frontend may need adjustment."
-    echo "For now, proceeding, but the build might require Dockerfile changes if not an npm project."
-else
-    echo "No lockfile (package-lock.json, yarn.lock, pnpm-lock.yaml) found in ${FRONTEND_DIR}."
+    NEEDS_LOCKFILE_GENERATION=false # Assume it's the correct lockfile for the project type
+elif [ -f "${ROOT_LOCKFILE_NPM}" ]; then
+    echo "Found a \`package-lock.json\` at the project root: ${ROOT_LOCKFILE_NPM}"
+    echo "This might be due to an npm workspace setup. The frontend Docker build expects this file inside ${FRONTEND_DIR}/."
+    read -p "Copy ${ROOT_LOCKFILE_NPM} to ${EXPECTED_LOCKFILE_NPM} for the Docker build? (y/n) [y]: " choice_copy_root_lockfile
+    if [[ "${choice_copy_root_lockfile,,}" == "y" || "${choice_copy_root_lockfile,,}" == "yes" || -z "${choice_copy_root_lockfile}" ]]; then
+        if cp "${ROOT_LOCKFILE_NPM}" "${EXPECTED_LOCKFILE_NPM}"; then
+            echo "Successfully copied ${ROOT_LOCKFILE_NPM} to ${EXPECTED_LOCKFILE_NPM}."
+            NEEDS_LOCKFILE_GENERATION=false
+        else
+            echo "Error: Failed to copy ${ROOT_LOCKFILE_NPM} to ${EXPECTED_LOCKFILE_NPM}." >&2
+            echo "Please perform the copy manually or resolve permissions issues."
+            echo "The Docker build for the frontend will likely fail."
+            NEEDS_LOCKFILE_GENERATION=true
+        fi
+    else
+        echo "Skipping copy. The frontend Docker build will likely fail without ${EXPECTED_LOCKFILE_NPM}."
+        echo "You might need to adjust Dockerfile.frontend to use the root lockfile or ensure it's copied manually."
+        NEEDS_LOCKFILE_GENERATION=true
+    fi
+fi
+
+if [ "$NEEDS_LOCKFILE_GENERATION" = true ]; then
+    echo "No suitable \`package-lock.json\` found in ${FRONTEND_DIR} for the Docker build."
     if [ ! -f "${PACKAGE_JSON}" ]; then
-        echo "Error: ${PACKAGE_JSON} not found! Cannot install frontend dependencies." >&2
+        echo "Error: ${PACKAGE_JSON} not found! Cannot install frontend dependencies or generate lockfile." >&2
         echo "Please ensure the frontend project is correctly structured."
     else
-        echo "The frontend Docker build requires package-lock.json for consistent dependency installation using 'npm ci'."
-        read -p "Do you want to attempt to generate package-lock.json now (runs 'npm install' commands in ${FRONTEND_DIR})? (y/n) [y]: " choice_npm_install
+        echo "The frontend Docker build requires ${EXPECTED_LOCKFILE_NPM} for 'npm ci'."
+        read -p "Do you want to attempt to generate/update ${EXPECTED_LOCKFILE_NPM} now (runs 'npm install' commands in ${FRONTEND_DIR})? (y/n) [y]: " choice_npm_install
         if [[ "${choice_npm_install,,}" == "y" || "${choice_npm_install,,}" == "yes" || -z "${choice_npm_install}" ]]; then
-            echo "Attempting to generate package-lock.json in ${FRONTEND_DIR}..."
+            echo "Attempting to generate/update ${EXPECTED_LOCKFILE_NPM} in ${FRONTEND_DIR}..."
             ORIGINAL_DIR=$(pwd)
             cd "${FRONTEND_DIR}"
             echo "Running 'npm install --package-lock-only --legacy-peer-deps' first..."
@@ -180,22 +204,34 @@ else
                 echo "Warning: 'npm install --package-lock-only' encountered issues. Will proceed with full 'npm install'."
             fi
 
-            if [ ! -f "package-lock.json" ]; then
-                echo "package-lock.json still not found. Running full 'npm install --legacy-peer-deps'..."
+            if [ ! -f "package-lock.json" ]; then # Check within FRONTEND_DIR
+                echo "package-lock.json still not found in $(pwd). Running full 'npm install --legacy-peer-deps'..."
                 if npm install --legacy-peer-deps; then
                     echo "Full 'npm install' completed."
                 else
-                    echo "Error: Full 'npm install' in ${FRONTEND_DIR} failed. Please check for errors above." >&2
+                    echo "Error: Full 'npm install' in $(pwd) failed. Please check for errors above." >&2
                 fi
             fi
-
             cd "${ORIGINAL_DIR}"
 
-            if [ -f "${LOCKFILE_NPM}" ]; then
-                echo "SUCCESS: ${LOCKFILE_NPM} has been generated/updated."
-                echo "IMPORTANT: Please commit ${LOCKFILE_NPM} to your Git repository!"
+            if [ -f "${EXPECTED_LOCKFILE_NPM}" ]; then
+                echo "SUCCESS: ${EXPECTED_LOCKFILE_NPM} has been generated/updated."
+                echo "IMPORTANT: Please commit ${EXPECTED_LOCKFILE_NPM} to your Git repository!"
+            elif [ -f "${ROOT_LOCKFILE_NPM}" ]; then # Check root again if frontend install created it at root
+                echo "Warning: \`package-lock.json\` was generated at the project root (${ROOT_LOCKFILE_NPM}) instead of ${EXPECTED_LOCKFILE_NPM}."
+                echo "This is likely due to an npm workspace configuration."
+                read -p "Copy ${ROOT_LOCKFILE_NPM} to ${EXPECTED_LOCKFILE_NPM} for the Docker build? (y/n) [y]: " choice_copy_root_lockfile_after_gen
+                if [[ "${choice_copy_root_lockfile_after_gen,,}" == "y" || "${choice_copy_root_lockfile_after_gen,,}" == "yes" || -z "${choice_copy_root_lockfile_after_gen}" ]]; then
+                    if cp "${ROOT_LOCKFILE_NPM}" "${EXPECTED_LOCKFILE_NPM}"; then
+                        echo "Successfully copied ${ROOT_LOCKFILE_NPM} to ${EXPECTED_LOCKFILE_NPM}. Please commit both (or just the one in ${FRONTEND_DIR} if workspaces are configured to share)."
+                    else
+                        echo "Error: Failed to copy ${ROOT_LOCKFILE_NPM} to ${EXPECTED_LOCKFILE_NPM}. The Docker build will likely fail." >&2
+                    fi
+                else
+                    echo "Skipping copy. The frontend Docker build will likely fail without ${EXPECTED_LOCKFILE_NPM}."
+                fi
             else
-                echo "CRITICAL ERROR: ${LOCKFILE_NPM} was NOT created in ${FRONTEND_DIR} even after attempting 'npm install' commands." >&2
+                echo "CRITICAL ERROR: ${EXPECTED_LOCKFILE_NPM} was NOT created and not found at root either, even after 'npm install' attempts." >&2
                 echo "The Docker build for the frontend WILL LIKELY FAIL." >&2
                 echo "Possible causes:" >&2
                 echo "  - Issues with your npm installation or version." >&2
@@ -206,7 +242,7 @@ else
                 echo "  2. npm install" >&2
                 echo "  3. (If no lockfile) npm install --package-lock-only" >&2
                 echo "  4. Inspect for errors and resolve them." >&2
-                echo "  5. Ensure ${LOCKFILE_NPM} is generated and then commit it to Git." >&2
+                echo "  5. Ensure ${EXPECTED_LOCKFILE_NPM} is generated and then commit it to Git." >&2
                 read -p "Do you want to continue with the script despite the high chance of Docker build failure? (y/n) [n]: " choice_continue_anyway
                 if [[ "${choice_continue_anyway,,}" != "y" && "${choice_continue_anyway,,}" != "yes" ]]; then
                     echo "Exiting script. Please resolve frontend dependency issues manually."
@@ -215,8 +251,7 @@ else
             fi
         else
             echo "Skipping frontend dependency generation attempt."
-            echo "Warning: The frontend Docker build may fail if ${LOCKFILE_NPM} is not present in ${FRONTEND_DIR}."
-            echo "Please ensure ${LOCKFILE_NPM} is generated (e.g., by running 'npm install' in ${FRONTEND_DIR}) and committed."
+            echo "Warning: The frontend Docker build may fail if ${EXPECTED_LOCKFILE_NPM} is not present."
         fi
     fi
 fi

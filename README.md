@@ -56,7 +56,11 @@ For a quicker and more automated setup of your local development environment (es
 This script will:
 - Prompt you for necessary API keys and secrets (Plaid, SendGrid, Django Secret Key).
 - Create the `ledgerpro/backend/.env` file with your inputs and appropriate defaults for Docker.
-- **Check for frontend dependencies:** If a lockfile (`package-lock.json`, etc.) is missing in `ledgerpro/frontend`, it will offer to run `npm install` to generate it. This is crucial for the frontend Docker build.
+- **Handle Frontend Dependencies & Lockfile:**
+    - Checks for `package-lock.json` in `ledgerpro/frontend/`.
+    - If not found there, it checks the project root (common in npm workspaces). If a root `package-lock.json` exists, it will ask if you want to copy it to `ledgerpro/frontend/` for the Docker build.
+    - If no lockfile is found in either location, it will offer to run `npm install` commands within `ledgerpro/frontend/` to generate `package-lock.json`. It will again check both locations after generation and offer to copy if it appears at the root.
+    - This process is crucial for the frontend Docker build, which requires the lockfile inside `ledgerpro/frontend/`.
 - Check for Docker and Docker Compose installations (and prefer Docker Compose V2 if available).
 - Optionally clean up any previous Docker environment for this project.
 - Build and start the Docker Compose services (backend, database, redis if configured).
@@ -210,7 +214,12 @@ npm install
 
 **Troubleshooting `package-lock.json` Generation:**
 
-If `npm install` does not create or update `package-lock.json`:
+-   **NPM Workspaces & Root Lockfile:** If you are using npm workspaces (defined in a `package.json` at the project root), `npm install` (even when run from `ledgerpro/frontend/`) might generate a single `package-lock.json` at the project root. The frontend Docker build (`Dockerfile.frontend`) currently expects the lockfile to be *inside* `ledgerpro/frontend/`.
+    - The `./setup_dev_env.sh` script attempts to detect this and will offer to copy a root lockfile to `ledgerpro/frontend/`.
+    - If managing manually, you may need to copy it: `cp ./package-lock.json ledgerpro/frontend/package-lock.json`.
+    - For a long-term solution with workspaces, consider adjusting `Dockerfile.frontend` to copy the lockfile from the root relative to its build context.
+
+If `npm install` does not create or update `package-lock.json` (in the expected `ledgerpro/frontend` location):
 -   **Check `.npmrc` files:** Look for an `.npmrc` file in the `ledgerpro/frontend` directory or your user home directory. It might contain `package-lock=false` or `shrinkwrap=false`. Remove or comment out this line.
 -   **NPM Version:** Ensure your Node Package Manager (npm) is reasonably up-to-date (`npm -v`). Outdated versions might have different behaviors. Consider updating npm: `npm install -g npm@latest`.
 -   **Force Lockfile:** Try running `npm install --package-lock-only` in the `ledgerpro/frontend` directory.
@@ -512,8 +521,12 @@ If you see errors like "port is already allocated" or "address already in use":
 
 ### 5. Frontend Docker Build Fails: "Lockfile not found"
 
+-   **NPM Workspaces Note:** If your project uses npm workspaces, `npm install` might place the `package-lock.json` at the project root. However, the default `Dockerfile.frontend` expects it inside the `ledgerpro/frontend` directory (relative to the Docker build context).
+    - The `./setup_dev_env.sh` script includes logic to detect a root lockfile and offer to copy it to `ledgerpro/frontend/`.
+    - If you encounter this issue during a manual build, ensure `ledgerpro/frontend/package-lock.json` exists. You might need to copy it from the root: `cp ./package-lock.json ledgerpro/frontend/package-lock.json`.
+
 If the `docker compose up --build` command fails during the frontend build stage with an error similar to "Lockfile not found" or issues with `npm ci`:
--   **Cause:** This means a `package-lock.json` (or `yarn.lock`/`pnpm-lock.yaml`, depending on your project type and Dockerfile setup) was not found in the `ledgerpro/frontend` directory when the Docker image was being built.
+-   **Cause:** This means a `package-lock.json` (or `yarn.lock`/`pnpm-lock.yaml`, depending on your project type and Dockerfile setup) was not found in the `ledgerpro/frontend` directory when the Docker image was being built (and it wasn't copied from root, if applicable).
 -   **Solution:**
     1.  Ensure you have run `npm install` (or your project's equivalent like `yarn install`) in the `ledgerpro/frontend` directory locally.
     2.  **Crucially, commit the generated `package-lock.json` (or equivalent lockfile) to your Git repository.**
