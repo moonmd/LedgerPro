@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from decimal import Decimal
 import logging
-from .account_utils import get_or_create_default_account # Added import
+from .account_utils import get_or_create_default_account
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +82,7 @@ class TransactionSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         journal_entries_data = validated_data.pop('journal_entries_set')
         request = self.context.get('request')
-        # Ensure organization is derived correctly, e.g. from request.user
-        organization = request.user.membership_set.first().organization # Make sure this is robust
+        organization = request.user.membership_set.first().organization
         transaction = Transaction.objects.create(organization=organization, created_by=request.user, **validated_data)
         total_debits = Decimal('0.00')
         total_credits = Decimal('0.00')
@@ -108,7 +107,6 @@ class AuditLogSerializer(serializers.ModelSerializer):
         model = AuditLog
         fields = ['id', 'user', 'organization', 'action', 'timestamp', 'details']
 
-# Customer Serializer (defined before InvoiceSerializer)
 class CustomerSerializer(serializers.ModelSerializer):
     organization = serializers.PrimaryKeyRelatedField(read_only=True)
     class Meta:
@@ -116,25 +114,23 @@ class CustomerSerializer(serializers.ModelSerializer):
         fields = ['id', 'organization', 'name', 'email', 'phone', 'created_at', 'updated_at']
         read_only_fields = ['id', 'organization', 'created_at', 'updated_at']
 
-# InvoiceItem Serializer (defined before InvoiceSerializer)
 class InvoiceItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = InvoiceItem
         fields = ['id', 'description', 'quantity', 'unit_price', 'amount', 'tax_amount']
         read_only_fields = ['id', 'amount']
     def validate(self, data):
-        if 'quantity' in data and 'unit_price' in data: # Ensure amount is calculated on validate
+        if 'quantity' in data and 'unit_price' in data:
             data['amount'] = data['quantity'] * data['unit_price']
-        elif self.instance: # Handle partial updates where only one of quantity/unit_price might be provided
+        elif self.instance:
             quantity = data.get('quantity', self.instance.quantity)
             unit_price = data.get('unit_price', self.instance.unit_price)
             data['amount'] = quantity * unit_price
         return data
 
-# Updated InvoiceSerializer with GL posting logic
 class InvoiceSerializer(serializers.ModelSerializer):
     organization = serializers.PrimaryKeyRelatedField(read_only=True)
-    created_by = UserDetailSerializer(read_only=True) # Changed for better detail
+    created_by = UserDetailSerializer(read_only=True)
     customer = serializers.PrimaryKeyRelatedField(queryset=Customer.objects.all())
     items = InvoiceItemSerializer(many=True)
     transaction = serializers.PrimaryKeyRelatedField(read_only=True)
@@ -153,12 +149,8 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'transaction', 'created_by', 'created_at', 'updated_at'
         ]
 
-    # _get_or_create_default_account method removed, will use centralized utility
-
     def _create_invoice_gl_transaction(self, invoice: Invoice, user):
-        '''Creates the general ledger transaction for an issued invoice.'''
         organization = invoice.organization
-
         accounts_receivable_acc = get_or_create_default_account(
             organization, Account.ASSET, 'Accounts Receivable', 'Accounts Receivable (Default)', 'accounts receivable'
         )
@@ -170,33 +162,23 @@ class InvoiceSerializer(serializers.ModelSerializer):
             sales_tax_payable_acc = get_or_create_default_account(
                 organization, Account.LIABILITY, 'Sales Tax Payable', 'Sales Tax Payable (Default)', 'sales tax payable'
             )
-
         gl_transaction = Transaction.objects.create(
-            organization=organization,
-            date=invoice.issue_date,
-            description=f'Invoice {invoice.invoice_number} to {invoice.customer.name}',
-            created_by=user
+            organization=organization, date=invoice.issue_date,
+            description=f'Invoice {invoice.invoice_number} to {invoice.customer.name}', created_by=user
         )
-
         JournalEntry.objects.create(
             transaction=gl_transaction, account=accounts_receivable_acc,
-            debit_amount=invoice.total_amount,
-            description=f'A/R for Invoice {invoice.invoice_number}'
+            debit_amount=invoice.total_amount, description=f'A/R for Invoice {invoice.invoice_number}'
         )
         JournalEntry.objects.create(
             transaction=gl_transaction, account=sales_revenue_acc,
-            credit_amount=invoice.subtotal,
-            description=f'Sales revenue for Invoice {invoice.invoice_number}'
+            credit_amount=invoice.subtotal, description=f'Sales revenue for Invoice {invoice.invoice_number}'
         )
         if sales_tax_payable_acc and invoice.total_tax > Decimal('0.00'):
             JournalEntry.objects.create(
                 transaction=gl_transaction, account=sales_tax_payable_acc,
-                credit_amount=invoice.total_tax,
-                description=f'Sales tax for Invoice {invoice.invoice_number}'
+                credit_amount=invoice.total_tax, description=f'Sales tax for Invoice {invoice.invoice_number}'
             )
-
-        # Validate transaction balance (optional here as model's save/clean should handle it)
-        # For explicit check:
         current_debits = sum(je.debit_amount for je in gl_transaction.journal_entries_set.all())
         current_credits = sum(je.credit_amount for je in gl_transaction.journal_entries_set.all())
         if current_debits != current_credits:
@@ -205,7 +187,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Failed to create a balanced GL transaction for the invoice.')
         return gl_transaction
 
-    def validate_customer(self, customer): # Ensure customer belongs to the right org
+    def validate_customer(self, customer):
         request = self.context.get('request')
         if request and hasattr(request, 'user') and request.user.is_authenticated:
             membership = request.user.membership_set.first()
@@ -219,11 +201,9 @@ class InvoiceSerializer(serializers.ModelSerializer):
         membership = request.user.membership_set.first()
         if not membership: raise serializers.ValidationError('User is not associated with any organization.')
         organization = membership.organization
-
         subtotal = sum(item['quantity'] * item['unit_price'] for item in items_data)
         total_tax = sum(item.get('tax_amount', Decimal('0.00')) for item in items_data)
         total_amount = subtotal + total_tax
-
         invoice = Invoice.objects.create(
             organization=organization, created_by=request.user,
             subtotal=subtotal, total_tax=total_tax, total_amount=total_amount,
@@ -231,7 +211,6 @@ class InvoiceSerializer(serializers.ModelSerializer):
         )
         for item_data in items_data:
             InvoiceItem.objects.create(invoice=invoice, **item_data)
-
         if invoice.status == Invoice.SENT:
             try:
                 gl_transaction = self._create_invoice_gl_transaction(invoice, request.user)
@@ -244,7 +223,6 @@ class InvoiceSerializer(serializers.ModelSerializer):
                  invoice.delete()
                  logger.error(f'Unexpected error creating GL for invoice {invoice.id}: {e}')
                  raise serializers.ValidationError(f'Failed to create GL transaction for invoice: {str(e)}')
-
         AuditLog.objects.create(
             organization=organization, user=request.user, action='created_invoice',
             details={'invoice_id': str(invoice.id), 'invoice_number': invoice.invoice_number, 'status': invoice.status}
@@ -255,33 +233,27 @@ class InvoiceSerializer(serializers.ModelSerializer):
         items_data = validated_data.pop('items', None)
         original_status = instance.status
         new_status = validated_data.get('status', original_status)
-
         instance.customer = validated_data.get('customer', instance.customer)
         instance.invoice_number = validated_data.get('invoice_number', instance.invoice_number)
         instance.issue_date = validated_data.get('issue_date', instance.issue_date)
         instance.due_date = validated_data.get('due_date', instance.due_date)
         instance.status = new_status
         instance.notes = validated_data.get('notes', instance.notes)
-
         if items_data is not None:
             instance.items.all().delete()
             current_subtotal = Decimal('0.00')
             current_total_tax = Decimal('0.00')
             for item_data in items_data:
-                # Calculate amount for each item before creating
                 item_data['amount'] = item_data['quantity'] * item_data['unit_price']
                 current_subtotal += item_data['amount']
                 current_total_tax += item_data.get('tax_amount', Decimal('0.00'))
                 InvoiceItem.objects.create(invoice=instance, **item_data)
-
             instance.subtotal = current_subtotal
             instance.total_tax = current_total_tax
             instance.total_amount = current_subtotal + current_total_tax
-        else: # If items_data is None, recalculate from existing items if other fields changed.
+        else:
             instance.calculate_totals()
-
         instance.save()
-
         if original_status == Invoice.DRAFT and new_status == Invoice.SENT:
             if not instance.transaction:
                 try:
@@ -290,17 +262,13 @@ class InvoiceSerializer(serializers.ModelSerializer):
                     instance.save(update_fields=['transaction'])
                 except Exception as e:
                     logger.error(f'Failed to create GL transaction for invoice {instance.id} on status change to SENT: {e}')
-                    # Decide on error handling: revert status, raise error, or just log.
-                    # For now, just log and proceed.
                     pass
-
         AuditLog.objects.create(
             organization=instance.organization, user=self.context['request'].user, action='updated_invoice',
             details={'invoice_id': str(instance.id), 'invoice_number': instance.invoice_number, 'new_status': new_status}
         )
         return instance
 
-# Vendor Serializer
 class VendorSerializer(serializers.ModelSerializer):
     organization = serializers.PrimaryKeyRelatedField(read_only=True)
     class Meta:
@@ -308,7 +276,6 @@ class VendorSerializer(serializers.ModelSerializer):
         fields = ['id', 'organization', 'name', 'email', 'phone', 'created_at', 'updated_at']
         read_only_fields = ['id', 'organization', 'created_at', 'updated_at']
 
-# Plaid and StagedBankTransaction Serializers
 class PlaidItemSerializer(serializers.ModelSerializer):
     organization = serializers.PrimaryKeyRelatedField(read_only=True)
     user = UserDetailSerializer(read_only=True)
@@ -316,25 +283,7 @@ class PlaidItemSerializer(serializers.ModelSerializer):
         model = PlaidItem
         fields = ['id', 'organization', 'user', 'institution_id', 'institution_name', 'last_successful_sync', 'created_at']
 
-class StagedBankTransactionSerializer(serializers.ModelSerializer):
-    organization = serializers.PrimaryKeyRelatedField(read_only=True)
-    plaid_item = PlaidItemSerializer(read_only=True, allow_null=True)
-    linked_transaction = TransactionSerializer(read_only=True, allow_null=True)
-    applied_rule = ReconciliationRuleSerializer(read_only=True, allow_null=True) # Changed to full serializer
-    suggested_matches = serializers.JSONField(read_only=True, allow_null=True)
-    class Meta:
-        model = StagedBankTransaction
-        fields = [
-            'id', 'organization', 'plaid_item', 'transaction_id_source',
-            'account_id_source', 'account_name_source',
-            'date', 'posted_date', 'name', 'merchant_name', 'amount', 'currency_code',
-            'category_source', 'status_source', 'reconciliation_status',
-            'linked_transaction', 'applied_rule', 'suggested_matches',
-            'imported_at', 'source'
-        ]
-        read_only_fields = ['id', 'organization', 'plaid_item', 'imported_at', 'raw_data', 'applied_rule', 'suggested_matches']
-
-# ReconciliationRule Serializer
+# Moved ReconciliationRuleSerializer before StagedBankTransactionSerializer
 class ReconciliationRuleSerializer(serializers.ModelSerializer):
     organization = serializers.PrimaryKeyRelatedField(read_only=True)
     created_by = UserDetailSerializer(read_only=True)
@@ -354,6 +303,24 @@ class ReconciliationRuleSerializer(serializers.ModelSerializer):
             if 'action_type' not in act:
                 raise serializers.ValidationError('Each action must have an action_type.')
         return value
+
+class StagedBankTransactionSerializer(serializers.ModelSerializer):
+    organization = serializers.PrimaryKeyRelatedField(read_only=True)
+    plaid_item = PlaidItemSerializer(read_only=True, allow_null=True)
+    linked_transaction = TransactionSerializer(read_only=True, allow_null=True)
+    applied_rule = ReconciliationRuleSerializer(read_only=True, allow_null=True)
+    suggested_matches = serializers.JSONField(read_only=True, allow_null=True)
+    class Meta:
+        model = StagedBankTransaction
+        fields = [
+            'id', 'organization', 'plaid_item', 'transaction_id_source',
+            'account_id_source', 'account_name_source',
+            'date', 'posted_date', 'name', 'merchant_name', 'amount', 'currency_code',
+            'category_source', 'status_source', 'reconciliation_status',
+            'linked_transaction', 'applied_rule', 'suggested_matches',
+            'imported_at', 'source'
+        ]
+        read_only_fields = ['id', 'organization', 'plaid_item', 'imported_at', 'raw_data', 'applied_rule', 'suggested_matches']
 
 # Payroll Serializers
 class EmployeeSerializer(serializers.ModelSerializer):
@@ -404,7 +371,7 @@ class PayRunSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'organization', 'pay_period_start_date', 'pay_period_end_date', 'payment_date',
             'status', 'notes', 'created_at', 'processed_by', 'processed_at',
-            'payslips', 'gl_transaction', # Added gl_transaction
+            'payslips', 'gl_transaction',
             'employee_inputs_for_processing'
         ]
         read_only_fields = ['id', 'organization', 'created_at', 'processed_by', 'processed_at', 'payslips', 'status', 'gl_transaction']

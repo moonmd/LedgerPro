@@ -89,9 +89,9 @@ echo "User input collection complete. Next steps will configure .env and Docker.
 echo "Configuring backend .env file at ledgerpro/backend/.env..."
 
 # Ensure backend directory exists (it should, but good practice)
-mkdir -p "ledgerpro/backend" # BACKEND_DIR definition used here
+mkdir -p "ledgerpro/backend"
 
-ENV_FILE="ledgerpro/backend/.env" #Matches definition in prompt
+ENV_FILE="ledgerpro/backend/.env"
 OVERWRITE_ENV=false
 if [ -f "${ENV_FILE}" ]; then
     echo "Found existing .env file at ${ENV_FILE}."
@@ -163,7 +163,7 @@ elif [ -f "${LOCKFILE_YARN}" ] || [ -f "${LOCKFILE_PNPM}" ]; then
     echo "Found a non-npm lockfile (${LOCKFILE_YARN} or ${LOCKFILE_PNPM}) in ${FRONTEND_DIR}."
     echo "The Dockerfile.frontend is currently configured for npm (package-lock.json and 'npm ci')."
     echo "If this project uses yarn or pnpm, Dockerfile.frontend may need adjustment."
-    NEEDS_LOCKFILE_GENERATION=false # Assume it's the correct lockfile for the project type
+    NEEDS_LOCKFILE_GENERATION=false
 elif [ -f "${ROOT_LOCKFILE_NPM}" ]; then
     echo "Found a \`package-lock.json\` at the project root: ${ROOT_LOCKFILE_NPM}"
     echo "This might be due to an npm workspace setup. The frontend Docker build expects this file inside ${FRONTEND_DIR}/."
@@ -204,7 +204,7 @@ if [ "$NEEDS_LOCKFILE_GENERATION" = true ]; then
                 echo "Warning: 'npm install --package-lock-only' encountered issues. Will proceed with full 'npm install'."
             fi
 
-            if [ ! -f "package-lock.json" ]; then # Check within FRONTEND_DIR
+            if [ ! -f "package-lock.json" ]; then
                 echo "package-lock.json still not found in $(pwd). Running full 'npm install --legacy-peer-deps'..."
                 if npm install --legacy-peer-deps; then
                     echo "Full 'npm install' completed."
@@ -217,7 +217,7 @@ if [ "$NEEDS_LOCKFILE_GENERATION" = true ]; then
             if [ -f "${EXPECTED_LOCKFILE_NPM}" ]; then
                 echo "SUCCESS: ${EXPECTED_LOCKFILE_NPM} has been generated/updated."
                 echo "IMPORTANT: Please commit ${EXPECTED_LOCKFILE_NPM} to your Git repository!"
-            elif [ -f "${ROOT_LOCKFILE_NPM}" ]; then # Check root again if frontend install created it at root
+            elif [ -f "${ROOT_LOCKFILE_NPM}" ]; then
                 echo "Warning: \`package-lock.json\` was generated at the project root (${ROOT_LOCKFILE_NPM}) instead of ${EXPECTED_LOCKFILE_NPM}."
                 echo "This is likely due to an npm workspace configuration."
                 read -p "Copy ${ROOT_LOCKFILE_NPM} to ${EXPECTED_LOCKFILE_NPM} for the Docker build? (y/n) [y]: " choice_copy_root_lockfile_after_gen
@@ -294,7 +294,6 @@ else
 fi
 
 # Ensure Redis is in docker-compose.yml if REDIS_URL is set to use 'redis' host
-# Define BACKEND_DIR for this check, consistent with how ENV_FILE was used.
 BACKEND_DIR="ledgerpro/backend"
 ENV_FILE_PATH="${BACKEND_DIR}/.env"
 if [ -f "${ENV_FILE_PATH}" ] && grep -q "REDIS_URL='redis://redis" "${ENV_FILE_PATH}"; then
@@ -328,28 +327,15 @@ rm "${UP_OUTPUT_FILE}"
 echo "Docker services started."
 
 # Wait for services to be ready (especially PostgreSQL)
-echo "Waiting for backend and database services to initialize (approx. 15-30 seconds)..."
-sleep 15 # Initial sleep
+echo "Waiting for backend and database services to initialize (fixed duration: 30 seconds)..."
+echo "(The \`pg_isready\` check was removed as the command may not be available in the backend image.)"
+sleep 30
+echo "Initial wait complete. Proceeding with migrations."
+echo "If migrations fail due to database connection issues, you may need to:"
+echo "  1. Ensure Docker services are fully up (check \`${DC_COMMAND} logs db\` and \`${DC_COMMAND} logs backend\`)."
+echo "  2. Wait a bit longer and then manually run: \`${DC_COMMAND} exec backend python manage.py migrate\`"
 
-MAX_DB_RETRIES=5
-DB_RETRY_COUNT=0
-DB_READY=false
-until [ "$DB_READY" = true ] || [ "$DB_RETRY_COUNT" -ge "$MAX_DB_RETRIES" ]; do
-    if ${DC_COMMAND} exec -T backend pg_isready -h db -p 5432 -U ledgerpro -d ledgerpro -q; then
-        echo "PostgreSQL database is ready."
-        DB_READY=true
-    else
-        DB_RETRY_COUNT=$((DB_RETRY_COUNT + 1))
-        echo "Database not yet ready (attempt ${DB_RETRY_COUNT}/${MAX_DB_RETRIES}). Waiting 5 seconds..."
-        sleep 5
-    fi
-done
-
-if [ "$DB_READY" = false ]; then
-    echo "Error: Database service did not become ready. Check Docker logs: ${DC_COMMAND} logs db" >&2
-    echo "You may need to wait longer and then manually run migrations and superuser creation."
-fi
-
+echo ""
 echo "Running Django database migrations inside the backend container..."
 ${DC_COMMAND} exec backend python manage.py migrate
 if [ $? -ne 0 ]; then
@@ -394,7 +380,7 @@ echo "    npm run dev"
 echo "  The frontend will typically be available at http://localhost:3000"
 echo ""
 echo "To stop the Docker Compose services:"
-echo "  Run '${DC_COMMAND} down' in the project root directory." # Use determined DC_COMMAND
+echo "  Run '${DC_COMMAND} down' in the project root directory."
 echo "  To also remove data volumes (e.g., database data): '${DC_COMMAND} down -v'"
 echo ""
 echo "To view logs for running services:"
