@@ -56,7 +56,8 @@ For a quicker and more automated setup of your local development environment (es
 This script will:
 - Prompt you for necessary API keys and secrets (Plaid, SendGrid, Django Secret Key).
 - Create the `ledgerpro/backend/.env` file with your inputs and appropriate defaults for Docker.
-- Check for Docker and Docker Compose installations.
+- **Check for frontend dependencies:** If a lockfile (`package-lock.json`, etc.) is missing in `ledgerpro/frontend`, it will offer to run `npm install` to generate it. This is crucial for the frontend Docker build.
+- Check for Docker and Docker Compose installations (and prefer Docker Compose V2 if available).
 - Optionally clean up any previous Docker environment for this project.
 - Build and start the Docker Compose services (backend, database, redis if configured).
 - Wait for the database service to be ready.
@@ -201,6 +202,8 @@ cd ledgerpro/frontend
 #### b. Install Node.js Dependencies
 ```bash
 npm install
+# This command will also generate or update your `package-lock.json` (or `yarn.lock`/`pnpm-lock.yaml`).
+# **Important:** Ensure this lockfile is committed to your Git repository for consistent builds.
 # Or if you prefer using yarn and have a yarn.lock file:
 # yarn install
 ```

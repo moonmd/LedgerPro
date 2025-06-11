@@ -144,6 +144,50 @@ else
     echo "Using existing ${ENV_FILE}. Ensure it's correctly configured for Docker Compose (e.g., DATABASE_URL uses 'db' as hostname)."
 fi
 
+# --- Frontend Dependency Setup ---
+echo ""
+echo "Checking frontend dependencies and lockfile..."
+
+FRONTEND_DIR="ledgerpro/frontend"
+LOCKFILE_NPM="${FRONTEND_DIR}/package-lock.json"
+LOCKFILE_YARN="${FRONTEND_DIR}/yarn.lock"
+LOCKFILE_PNPM="${FRONTEND_DIR}/pnpm-lock.yaml"
+
+if [ -f "${LOCKFILE_NPM}" ] || [ -f "${LOCKFILE_YARN}" ] || [ -f "${LOCKFILE_PNPM}" ]; then
+    echo "Lockfile (package-lock.json, yarn.lock, or pnpm-lock.yaml) found in ${FRONTEND_DIR}."
+    echo "This will be used for the Docker frontend build."
+else
+    echo "No lockfile found in ${FRONTEND_DIR}."
+    echo "The frontend Docker build requires a lockfile (e.g., package-lock.json) for consistent dependency installation."
+    read -p "Do you want to install frontend dependencies now (runs 'npm install' in ${FRONTEND_DIR}) to generate it? (y/n) [y]: " choice_npm_install
+    if [[ "${choice_npm_install,,}" == "y" || "${choice_npm_install,,}" == "yes" || -z "${choice_npm_install}" ]]; then
+        echo "Attempting to install frontend dependencies in ${FRONTEND_DIR}..."
+        if [ -d "${FRONTEND_DIR}" ] && [ -f "${FRONTEND_DIR}/package.json" ]; then
+            ORIGINAL_DIR=$(pwd)
+            cd "${FRONTEND_DIR}"
+            if npm install; then
+                echo "Frontend dependencies installed successfully."
+                if [ -f "package-lock.json" ]; then
+                    echo "package-lock.json has been generated. Please remember to commit it to your repository."
+                else
+                    echo "Warning: npm install completed, but package-lock.json was not found. The Docker build might still fail."
+                    echo "Ensure your npm version creates a lockfile or try running 'npm install' manually in ${FRONTEND_DIR}."
+                fi
+            else
+                echo "Error: 'npm install' in ${FRONTEND_DIR} failed. Please check for errors above." >&2
+                echo "You may need to run 'npm install' manually in ${FRONTEND_DIR} and commit the lockfile."
+            fi
+            cd "${ORIGINAL_DIR}"
+        else
+            echo "Error: Frontend directory '${FRONTEND_DIR}' or 'package.json' not found. Cannot install dependencies." >&2
+        fi
+    else
+        echo "Skipping frontend dependency installation."
+        echo "Warning: The frontend Docker build may fail if a lockfile is not present in ${FRONTEND_DIR}."
+        echo "Please run 'npm install' (or equivalent) in ${FRONTEND_DIR} and commit the generated lockfile."
+    fi
+fi
+echo ""
 # --- Docker Compose & Initial Backend Setup ---
 echo "Proceeding with Docker Compose setup..."
 
