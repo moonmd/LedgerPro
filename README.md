@@ -522,8 +522,9 @@ If you see errors like "port is already allocated" or "address already in use":
 ### 5. Frontend Docker Build Fails: "Lockfile not found"
 
 -   **NPM Workspaces Note:** If your project uses npm workspaces, `npm install` might place the `package-lock.json` at the project root. However, the default `Dockerfile.frontend` expects it inside the `ledgerpro/frontend` directory (relative to the Docker build context).
-    - The `./setup_dev_env.sh` script includes logic to detect a root lockfile and offer to copy it to `ledgerpro/frontend/`.
-    - If you encounter this issue during a manual build, ensure `ledgerpro/frontend/package-lock.json` exists. You might need to copy it from the root: `cp ./package-lock.json ledgerpro/frontend/package-lock.json`.
+    - The `setup_dev_env.sh` script (see "Automated Development Setup Script" section) includes logic to detect a root lockfile and offer to copy it to `ledgerpro/frontend/`.
+    - If you encounter this issue during a manual build (not using the setup script), ensure `ledgerpro/frontend/package-lock.json` exists. You might need to copy it from the root: `cp ./package-lock.json ledgerpro/frontend/package-lock.json`.
+    - For a more permanent solution with workspaces, you might consider adjusting `Dockerfile.frontend` to correctly locate the lockfile from the project root relative to its build context, or ensure your workspace commands place/copy the lockfile into the frontend directory.
 
 If the `docker compose up --build` command fails during the frontend build stage with an error similar to "Lockfile not found" or issues with `npm ci`:
 -   **Cause:** This means a `package-lock.json` (or `yarn.lock`/`pnpm-lock.yaml`, depending on your project type and Dockerfile setup) was not found in the `ledgerpro/frontend` directory when the Docker image was being built (and it wasn't copied from root, if applicable).
