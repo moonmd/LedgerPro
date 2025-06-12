@@ -298,6 +298,54 @@ class StagedBankTransactionDetailView(OrganizationScopedViewMixin, generics.Retr
     queryset = StagedBankTransaction.objects.all()
     serializer_class = StagedBankTransactionSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+class StagedBankTransactionSuggestMatchesView(OrganizationScopedViewMixin, generics.GenericAPIView):
+    queryset = StagedBankTransaction.objects.all()
+    serializer_class = StagedBankTransactionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk=None):
+        staged_tx = self.get_object()
+        suggestions = reconciliation_service.find_suggested_matches(staged_tx)
+        return Response(suggestions)
+
+class StagedBankTransactionMatchView(OrganizationScopedViewMixin, generics.GenericAPIView):
+    queryset = StagedBankTransaction.objects.all()
+    serializer_class = StagedBankTransactionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk=None):
+        staged_tx = self.get_object()
+        ledger_pro_tx_id = request.data.get('ledger_pro_transaction_id')
+        if staged_tx.reconciliation_status != StagedBankTransaction.RECON_UNMATCHED:
+            return Response({'error': 'Transaction already reconciled or processed.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            target_tx = Transaction.objects.get(id=ledger_pro_tx_id, organization=staged_tx.organization)
+            staged_tx.linked_transaction = target_tx
+            staged_tx.reconciliation_status = StagedBankTransaction.RECON_MATCHED
+            staged_tx.save(update_fields=['linked_transaction', 'reconciliation_status'])
+            AuditLog.objects.create(organization=staged_tx.organization, user=request.user, action='matched_bank_transaction', details={'staged_tx_id': str(staged_tx.id), 'ledger_tx_id': str(target_tx.id)})
+            return Response(StagedBankTransactionSerializer(staged_tx).data)
+        except Transaction.DoesNotExist:
+            return Response({'error': 'Target LedgerPro transaction not found.'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f'Error matching staged tx {staged_tx.id} to tx {ledger_pro_tx_id}: {e}')
+            return Response({'error': 'Failed to match transaction.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class StagedBankTransactionCreateLedgerView(OrganizationScopedViewMixin, generics.GenericAPIView):
+    queryset = StagedBankTransaction.objects.all()
+    serializer_class = StagedBankTransactionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk=None):
+        staged_tx = self.get_object()
+        if staged_tx.reconciliation_status != StagedBankTransaction.RECON_UNMATCHED:
+            return Response({'error': 'Transaction already reconciled or processed.'}, status=status.HTTP_400_BAD_REQUEST)
+        staged_tx.reconciliation_status = StagedBankTransaction.RECON_CREATED_TRANSACTION
+        staged_tx.save(update_fields=['reconciliation_status'])
+        AuditLog.objects.create(organization=staged_tx.organization, user=request.user, action='created_ledger_tx_from_bank_tx', details={'staged_tx_id': str(staged_tx.id)})
+        logger.info(f'User initiated creation of LedgerPro transaction from staged_tx {staged_tx.id}')
+        return Response(StagedBankTransactionSerializer(staged_tx).data)
     @action(detail=True, methods=['get'], url_path='suggest-matches')
     def suggest_matches(self, request, pk=None):
         staged_tx = self.get_object()
@@ -427,7 +475,3 @@ class PayslipDetailView(OrganizationScopedViewMixin, generics.RetrieveAPIView):
     permission_classes = [permissions.IsAuthenticated]
     def get_queryset(self):
          return Payslip.objects.filter(pay_run__organization=self.get_organization())
-
-[end of ledgerpro/backend/api/views.py]
-
-[end of ledgerpro/backend/api/views.py]

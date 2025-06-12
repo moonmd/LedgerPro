@@ -15,7 +15,9 @@ from .views import (
     ProfitAndLossView, BalanceSheetView,
     InvoiceSendEmailView, # Added for send email action
     # Payroll Views
-    EmployeeViewSet, DeductionTypeViewSet, PayRunViewSet, PayslipListView, PayslipDetailView
+    EmployeeViewSet, DeductionTypeViewSet, PayRunViewSet, PayslipListView, PayslipDetailView,
+    # New views for staged bank transactions
+    StagedBankTransactionSuggestMatchesView, StagedBankTransactionMatchView, StagedBankTransactionCreateLedgerView
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 
@@ -61,9 +63,9 @@ urlpatterns = [
 
     path('bank/staged-transactions/', StagedBankTransactionListView.as_view(), name='staged-bank-transaction-list'),
     path('bank/staged-transactions/<uuid:pk>/', StagedBankTransactionDetailView.as_view(), name='staged-bank-transaction-detail'),
-    path('bank/staged-transactions/<uuid:pk>/suggest-matches/', StagedBankTransactionDetailView.as_view({'get': 'suggest_matches'}), name='staged-bank-transaction-suggest-matches'),
-    path('bank/staged-transactions/<uuid:pk>/match-to-transaction/', StagedBankTransactionDetailView.as_view({'post': 'match_to_transaction'}), name='staged-bank-transaction-match'),
-    path('bank/staged-transactions/<uuid:pk>/create-ledger-transaction/', StagedBankTransactionDetailView.as_view({'post': 'create_ledger_transaction'}), name='staged-bank-transaction-create-ledger'),
+    path('bank/staged-transactions/<uuid:pk>/suggest-matches/', StagedBankTransactionSuggestMatchesView.as_view(), name='staged-bank-transaction-suggest-matches'),
+    path('bank/staged-transactions/<uuid:pk>/match-to-transaction/', StagedBankTransactionMatchView.as_view(), name='staged-bank-transaction-match'),
+    path('bank/staged-transactions/<uuid:pk>/create-ledger-transaction/', StagedBankTransactionCreateLedgerView.as_view(), name='staged-bank-transaction-create-ledger'),
     path('bank/manual-import/', ManualBankStatementImportView.as_view(), name='manual-bank-statement-import'),
 
     path('bank/reconciliation-rules/', ReconciliationRuleViewSet.as_view(), name='recon-rule-list-create'), # Assuming ListCreateAPIView
