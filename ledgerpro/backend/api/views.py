@@ -429,3 +429,5 @@ class PayslipDetailView(OrganizationScopedViewMixin, generics.RetrieveAPIView):
          return Payslip.objects.filter(pay_run__organization=self.get_organization())
 
 [end of ledgerpro/backend/api/views.py]
+
+[end of ledgerpro/backend/api/views.py]
