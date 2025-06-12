@@ -1,0 +1,3 @@
+# This .gitkeep file ensures the 'public' directory is tracked by Git,
+# even if it's empty. Next.js uses this directory for static assets
+# like images, fonts, etc., that are served from the root of the site.

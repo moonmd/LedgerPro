@@ -1,0 +1,70 @@
+# General ignores for version control systems and IDEs
+.git/
+.github/
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+*.tmp
+*.bak
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Python specific
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+# Python virtual environment folders
+venv/
+env/
+.venv/
+*/venv/
+*/env/
+*/.venv/
+# Distribution / packaging
+.Python
+build/
+dist/
+eggs/
+.eggs/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Node.js specific - CRUCIAL
+node_modules/
+*/node_modules/ # Catches node_modules in any subdirectory like ledgerpro/frontend/node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Frontend build artifacts (if generated locally and not explicitly needed in context)
+# These paths should be relative to the .dockerignore file (project root)
+ledgerpro/frontend/.next/
+ledgerpro/frontend/out/
+# ledgerpro/frontend/build/
+
+# Backend static files collected locally (if any)
+# ledgerpro/backend/staticfiles/
+
+# Log files
+*.log
+logs/
+
+# Environment files - IMPORTANT: Ensure .env.example IS NOT ignored if you have one.
+# .env # Typically .env files should not be in .dockerignore if they contain build-time args for Docker
+# */.env # or if they are copied into an image, which is not best practice for secrets.
+# .env.* # Best to use Docker build arguments or secrets management for sensitive data.
+# */.env.*
+# !.env.example
+# !*/.env.example
+
+# LedgerPro specific temp/local files (examples, add as needed)
+# local_db.sqlite3
+# media_uploads_local/
