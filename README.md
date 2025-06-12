@@ -2,10 +2,14 @@
 
 ## Badges
 
-[![CI/CD](https://github.com/YOUR_USERNAME/YOUR_REPONAME/actions/workflows/cicd.yml/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPONAME/actions/workflows/cicd.yml) <!-- Replace YOUR_USERNAME/YOUR_REPONAME -->
+[![CI/CD](https://github.com/moonmd/LedgerPro/actions/workflows/cicd.yml/badge.svg)](https://github.com/moonmd/LedgerPro/actions/workflows/cicd.yml)
 <!-- Add other badges here, e.g., Code Coverage, Version, License -->
 
 ## Overview
+
+This is a test case for using Google's Jules AI coder to develop a project from a Product Requirements Document. It was finalized using Cline (Deepseek-R1-0528) to perform cleanup and bug fixes.
+
+## Introduction
 
 LedgerPro is a cloud-native, small-business accounting platform designed to replicate and surpass the core functionalities of existing solutions like QuickBooks Online. It aims to provide robust, intuitive, and highly adaptable financial management tools, from double-entry bookkeeping and invoicing to payroll and advanced reporting.
 
@@ -74,8 +78,8 @@ This script will:
 1.  **Ensure Prerequisites:** You still need Git, Docker, and Docker Compose installed.
 2.  **Clone the Repository:** (If you haven't already)
     ```bash
-    git clone https://github.com/YOUR_USERNAME/YOUR_REPONAME.git # Replace
-    cd YOUR_REPONAME
+    git clone https://github.com/moonmd/LedgerPro.git # Replace
+    cd LedgerPro
     ```
 3.  **Make the script executable:**
     ```bash
@@ -105,8 +109,8 @@ This section guides you through setting up LedgerPro for local development and t
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPONAME.git # Replace YOUR_USERNAME/YOUR_REPONAME
-cd YOUR_REPONAME # Or your chosen directory name
+git clone https://github.com/moonmd/LedgerPro.git
+cd LedgerPro
 ```
 
 ### 2. Backend Setup (Django / Python)
