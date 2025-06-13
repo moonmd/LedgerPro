@@ -1,0 +1,26 @@
+# Backend Dockerfile (Python/Django)
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+WORKDIR /app
+
+# Install system dependencies if any (e.g., for psycopg2 if not using -binary)
+# RUN apt-get update && apt-get install -y ... && rm -rf /var/lib/apt/lists/*
+
+COPY ledgerpro/backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY ledgerpro/backend .
+
+# Placeholder for collecting static files if serving from Django in dev/non-CDN setup
+# RUN python manage.py collectstatic --noinput
+
+# Gunicorn will be the entrypoint in production-like environments
+# For local dev, manage.py runserver might be used via docker-compose override
+EXPOSE 8000
+
+# CMD ["gunicorn", "ledgerpro_project.wsgi:application", "--bind", "0.0.0.0:8000"]
+# For now, a simpler CMD for basic testing, Gunicorn setup will be refined.
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

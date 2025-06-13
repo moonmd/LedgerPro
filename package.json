@@ -1,0 +1,14 @@
+{
+  "name": "ledgerpro-monorepo",
+  "private": true,
+  "workspaces": [
+    "ledgerpro/frontend",
+    "ledgerpro/backend"
+  ],
+  "scripts": {
+    "dev:frontend": "npm run dev --workspace=ledgerpro/frontend",
+    "dev:backend": "echo \"Backend dev script placeholder\" ",
+    "lint": "npm run lint --workspace=ledgerpro/frontend && npm run lint --workspace=ledgerpro/backend",
+    "test": "npm run test --workspace=ledgerpro/frontend && npm run test --workspace=ledgerpro/backend"
+  }
+}
