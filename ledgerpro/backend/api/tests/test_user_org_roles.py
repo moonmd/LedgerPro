@@ -3,6 +3,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from ledgerpro.backend.api.models import User, Organization, Role, Membership
 
+
 class UserOrgRoleAPITests(APITestCase):
     def setUp(self):
         # User for registration/login tests
@@ -42,7 +43,6 @@ class UserOrgRoleAPITests(APITestCase):
         admin_role = Role.objects.get(name='Admin')
         self.assertTrue(Membership.objects.filter(user=user, organization=organization, role=admin_role).exists())
 
-
     def test_user_login_and_me_endpoint(self):
         # Register user first
         self.client.post(self.register_url, self.user_data1, format='json')
@@ -60,10 +60,10 @@ class UserOrgRoleAPITests(APITestCase):
         self.assertEqual(response_me.data['email'], self.user_data1['email'])
 
     def test_duplicate_email_registration(self):
-        self.client.post(self.register_url, self.user_data1, format='json') # First registration
-        response_duplicate = self.client.post(self.register_url, self.user_data1, format='json') # Try again
+        self.client.post(self.register_url, self.user_data1, format='json')  # First registration
+        response_duplicate = self.client.post(self.register_url, self.user_data1, format='json')  # Try again
         self.assertEqual(response_duplicate.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('email', response_duplicate.data.get('errors', response_duplicate.data)) # Check for email error field; structure may vary
+        self.assertIn('email', response_duplicate.data.get('errors', response_duplicate.data))  # Check for email error field; structure may vary
 
     def test_role_management_as_admin(self):
         self.client.login(email='admin@example.com', password='adminpassword')
@@ -83,8 +83,7 @@ class UserOrgRoleAPITests(APITestCase):
         # Default "Admin" role is created by UserRegistrationSerializer if an org is made.
         # "GlobalAdmin" was not created in setUp for all tests, only for this admin user.
         # It's better to check for roles known to be there or created in this test.
-        # self.assertIn('GlobalAdmin', role_names_in_response) # This might not exist depending on other tests or setup
-
+        # self.assertIn('GlobalAdmin', role_names_in_response)  # This might not exist depending on other tests or setup
 
     def test_role_management_as_non_admin(self):
         # Register and login as a normal user

@@ -1,9 +1,11 @@
 # Placeholder for Django project settings.py
 import os
 from pathlib import Path
+from datetime import timedelta  # Moved E402
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-placeholder-key' # Replace in production
+SECRET_KEY = 'django-insecure-placeholder-key'  # Replace in production
 DEBUG = True
 ALLOWED_HOSTS = ['0.0.0.0', 'localhost', '127.0.0.1']
 
@@ -15,7 +17,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'api', # Our app
+    'api',  # Our app
 ]
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -46,16 +48,16 @@ WSGI_APPLICATION = 'ledgerpro_project.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3', # Placeholder, will use PostgreSQL
+        'NAME': BASE_DIR / 'db.sqlite3',  # Placeholder, will use PostgreSQL
     }
 }
 # Password validation (kept for now, might be handled by other auth systems later)
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
 AUTH_PASSWORD_VALIDATORS = [
-    { 'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator', },
-    { 'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', },
-    { 'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator', },
-    { 'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator', },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator', },
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', },
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator', },
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator', },
 ]
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
@@ -78,9 +80,8 @@ REST_FRAMEWORK = {
 }
 
 # Simple JWT Settings
-from datetime import timedelta
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60), # Adjust as needed
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),  # Adjust as needed
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
 }
 
@@ -90,10 +91,10 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@ledgerpro.exa
 
 # Plaid Configuration (Section 7.3)
 PLAID_CLIENT_ID = os.environ.get('PLAID_CLIENT_ID', 'YOUR_PLAID_CLIENT_ID')
-PLAID_SECRET_SANDBOX = os.environ.get('PLAID_SECRET_SANDBOX', 'YOUR_PLAID_SECRET_SANDBOX') # For Sandbox
-PLAID_SECRET_DEVELOPMENT = os.environ.get('PLAID_SECRET_DEVELOPMENT', 'YOUR_PLAID_SECRET_DEVELOPMENT') # For Development
-PLAID_ENV = os.environ.get('PLAID_ENV', 'sandbox') # e.g., 'sandbox', 'development', 'production'
-PLAID_PRODUCTS = os.environ.get('PLAID_PRODUCTS', 'transactions').split(',') # e.g., ['transactions']
-PLAID_COUNTRY_CODES = os.environ.get('PLAID_COUNTRY_CODES', 'US').split(',') # e.g., ['US']
+PLAID_SECRET_SANDBOX = os.environ.get('PLAID_SECRET_SANDBOX', 'YOUR_PLAID_SECRET_SANDBOX')  # For Sandbox
+PLAID_SECRET_DEVELOPMENT = os.environ.get('PLAID_SECRET_DEVELOPMENT', 'YOUR_PLAID_SECRET_DEVELOPMENT')  # For Development
+PLAID_ENV = os.environ.get('PLAID_ENV', 'sandbox')  # e.g., 'sandbox', 'development', 'production'
+PLAID_PRODUCTS = os.environ.get('PLAID_PRODUCTS', 'transactions').split(',')  # e.g., ['transactions']
+PLAID_COUNTRY_CODES = os.environ.get('PLAID_COUNTRY_CODES', 'US').split(',')  # e.g., ['US']
 # Redirect URI for Plaid Link (OAuth) - often handled by frontend, but backend might need to be aware
 PLAID_REDIRECT_URI = os.environ.get('PLAID_REDIRECT_URI', None)

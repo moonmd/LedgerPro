@@ -1,13 +1,14 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.conf import settings
-from django.db.models import Sum, Q, F
+from django.db.models import Sum, Q
 from django.core.exceptions import ValidationError
 import uuid
-from decimal import Decimal # Added for get_period_activity
+from decimal import Decimal  # Added for get_period_activity
+
 
 class Organization(models.Model):
-    '''Represents a business entity using LedgerPro.'''
+    """Represents a business entity using LedgerPro."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -16,6 +17,7 @@ class Organization(models.Model):
     def __str__(self):
         return self.name
 
+
 class Role(models.Model):
     # Predefined roles, e.g., Admin, Accountant, Sales Manager, ReadOnly
     name = models.CharField(max_length=100, unique=True)
@@ -23,6 +25,7 @@ class Role(models.Model):
 
     def __str__(self):
         return self.name
+
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -57,18 +60,23 @@ class User(AbstractUser):
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
     objects = CustomUserManager()
+
     def __str__(self):
         return self.email
+
 
 class Membership(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
     role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True, blank=True)
     date_joined = models.DateField(auto_now_add=True)
+
     class Meta:
         unique_together = ('user', 'organization')
+
     def __str__(self):
         return f'{self.user.email} in {self.organization.name} as {self.role.name if self.role else "No Role"}'
+
 
 class Account(models.Model):
     ASSET = 'ASSET'
@@ -88,10 +96,13 @@ class Account(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
     class Meta:
         unique_together = ('organization', 'name', 'type')
+
     def __str__(self):
         return f'{self.name} ({self.get_type_display()})'
+
     def get_balance(self, date_to=None):
         debit_sum = self.journal_entries.filter(
             Q(transaction__date__lte=date_to) if date_to else Q()
@@ -103,6 +114,7 @@ class Account(models.Model):
             return debit_sum - credit_sum
         else:
             return credit_sum - debit_sum
+
     def get_period_activity(self, date_from, date_to):
         if not (date_from and date_to):
             raise ValueError('Both date_from and date_to are required for period activity.')
@@ -122,6 +134,7 @@ class Account(models.Model):
             return credits_in_period - debits_in_period
         return Decimal('0.00')
 
+
 class Transaction(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='transactions')
@@ -131,8 +144,10 @@ class Transaction(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='created_transactions')
+
     def __str__(self):
         return f'Transaction {self.id} on {self.date} for {self.organization.name}'
+
     def clean(self):
         super().clean()
         if hasattr(self, 'journal_entries_set'):
@@ -142,8 +157,10 @@ class Transaction(models.Model):
                 total_credits = entries.aggregate(total=Sum('credit_amount'))['total'] or Decimal('0.00')
                 if total_debits != total_credits:
                     raise ValidationError('Debits must equal Credits for the transaction.')
+
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
+
 
 class JournalEntry(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -152,12 +169,15 @@ class JournalEntry(models.Model):
     debit_amount = models.DecimalField(max_digits=19, decimal_places=2, default=Decimal('0.00'))
     credit_amount = models.DecimalField(max_digits=19, decimal_places=2, default=Decimal('0.00'))
     description = models.CharField(max_length=255, blank=True, null=True)
+
     class Meta:
         verbose_name_plural = 'Journal Entries'
+
     def __str__(self):
         if self.debit_amount > 0:
             return f'DEBIT {self.account.name}: {self.debit_amount}'
         return f'CREDIT {self.account.name}: {self.credit_amount}'
+
     def clean(self):
         super().clean()
         if self.debit_amount < Decimal('0.00') or self.credit_amount < Decimal('0.00'):
@@ -166,9 +186,11 @@ class JournalEntry(models.Model):
             raise ValidationError('A journal entry line cannot be both a debit and a credit.')
         if self.debit_amount == Decimal('0.00') and self.credit_amount == Decimal('0.00'):
             raise ValidationError('Either debit or credit amount must be provided.')
+
     def save(self, *args, **kwargs):
         self.clean()
         super().save(*args, **kwargs)
+
 
 class AuditLog(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
@@ -176,8 +198,10 @@ class AuditLog(models.Model):
     action = models.CharField(max_length=255)
     timestamp = models.DateTimeField(auto_now_add=True)
     details = models.JSONField(blank=True, null=True)
+
     def __str__(self):
         return f'{self.action} by {self.user.email if self.user else "System"} at {self.timestamp}'
+
 
 class Customer(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -187,11 +211,14 @@ class Customer(models.Model):
     phone = models.CharField(max_length=50, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
     class Meta:
         unique_together = ('organization', 'name')
         ordering = ['name']
+
     def __str__(self):
         return self.name
+
 
 class Invoice(models.Model):
     DRAFT = 'DRAFT'
@@ -218,11 +245,14 @@ class Invoice(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='created_invoices')
+
     class Meta:
         unique_together = ('organization', 'invoice_number')
         ordering = ['-issue_date', '-invoice_number']
+
     def __str__(self):
         return f'Invoice {self.invoice_number} for {self.customer.name}'
+
     def calculate_totals(self):
         items = self.items.all()
         self.subtotal = sum(item.amount for item in items if item.amount is not None)
@@ -237,12 +267,15 @@ class InvoiceItem(models.Model):
     unit_price = models.DecimalField(max_digits=19, decimal_places=2)
     amount = models.DecimalField(max_digits=19, decimal_places=2)
     tax_amount = models.DecimalField(max_digits=19, decimal_places=2, default=Decimal('0.00'))
+
     def save(self, *args, **kwargs):
         if self.quantity is not None and self.unit_price is not None:
             self.amount = self.quantity * self.unit_price
         super().save(*args, **kwargs)
+
     def __str__(self):
         return f'{self.description} (Qty: {self.quantity})'
+
 
 class Vendor(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -252,11 +285,14 @@ class Vendor(models.Model):
     phone = models.CharField(max_length=50, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
     class Meta:
         unique_together = ('organization', 'name')
         ordering = ['name']
+
     def __str__(self):
         return self.name
+
 
 class PlaidItem(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -270,13 +306,15 @@ class PlaidItem(models.Model):
     sync_cursor = models.CharField(max_length=255, blank=True, null=True, help_text='Cursor for Plaid transactions sync')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
     def __str__(self):
         return f'{self.institution_name} for {self.organization.name} (Item ID: {self.item_id})'
+
 
 class StagedBankTransaction(models.Model):
     PENDING = 'PENDING'
     POSTED = 'POSTED'
-    STATUS_CHOICES = [ (PENDING, 'Pending'), (POSTED, 'Posted'), ]
+    STATUS_CHOICES = [(PENDING, 'Pending'), (POSTED, 'Posted'), ]
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='staged_bank_transactions')
     plaid_item = models.ForeignKey(PlaidItem, on_delete=models.CASCADE, null=True, blank=True, related_name='staged_transactions', help_text='Associated Plaid item if imported via Plaid')
@@ -305,11 +343,14 @@ class StagedBankTransaction(models.Model):
     raw_data = models.JSONField(null=True, blank=True, help_text='Raw data from Plaid or CSV for auditing/debugging')
     imported_at = models.DateTimeField(auto_now_add=True)
     source = models.CharField(max_length=10, choices=[('PLAID', 'Plaid'), ('CSV', 'CSV'), ('QBO', 'QBO')], default='PLAID')
+
     class Meta:
         ordering = ['-date', '-imported_at']
         unique_together = ('organization', 'transaction_id_source')
+
     def __str__(self):
         return f'{self.name} ({self.amount} {self.currency_code}) on {self.date}'
+
 
 class ReconciliationRule(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -322,10 +363,13 @@ class ReconciliationRule(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='created_recon_rules')
+
     class Meta:
         ordering = ['organization', 'priority', 'name']
+
     def __str__(self):
         return f'{self.name} for {self.organization.name}'
+
 
 # Payroll Models (ST-106)
 
@@ -364,7 +408,7 @@ class Employee(models.Model):
 
 
 class PayRun(models.Model):
-    '''Represents a payroll cycle for a group of employees.'''
+    """Represents a payroll cycle for a group of employees."""
     DRAFT = 'DRAFT'
     PROCESSING = 'PROCESSING'
     COMPLETED = 'COMPLETED'
@@ -410,6 +454,7 @@ class DeductionType(models.Model):
 
     class Meta:
         unique_together = ('organization', 'name')
+
     def __str__(self):
         return f'{self.name} ({self.get_tax_treatment_display()})'
 
@@ -435,6 +480,7 @@ class Payslip(models.Model):
 
     def __str__(self):
         return f'Payslip for {self.employee} - PayRun {self.pay_run.id}'
+
 
 class PayslipDeduction(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

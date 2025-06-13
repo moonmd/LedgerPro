@@ -2,11 +2,12 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 from decimal import Decimal
-from unittest import mock # For mocking email sending
+from unittest import mock  # For mocking email sending
 
 from ledgerpro.backend.api.models import (
-    User, Organization, Role, Membership, Customer, Invoice, InvoiceItem, Account
+    User, Organization, Role, Membership, Customer, Invoice, Account  # InvoiceItem removed F401
 )
+
 
 class InvoicingAPITests(APITestCase):
     def setUp(self):
@@ -25,13 +26,11 @@ class InvoicingAPITests(APITestCase):
         Account.objects.get_or_create(organization=self.organization, name='Sales Revenue (Default)', type=Account.REVENUE)
         Account.objects.get_or_create(organization=self.organization, name='Sales Tax Payable (Default)', type=Account.LIABILITY)
 
-
         self.customers_url = reverse('customer-list-create')
         self.invoices_url = reverse('invoice-list-create')
         self.customer_detail_url = lambda pk: reverse('customer-detail', kwargs={'pk': pk})
         self.invoice_detail_url = lambda pk: reverse('invoice-detail', kwargs={'pk': pk})
         self.invoice_send_email_url = lambda pk: reverse('invoice-send-email', kwargs={'pk': pk})
-
 
     # Customer API Tests
     def test_create_customer(self):
@@ -43,7 +42,7 @@ class InvoicingAPITests(APITestCase):
     def test_list_customers(self):
         response = self.client.get(self.customers_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 2) # customer1 and customer2
+        self.assertEqual(len(response.data), 2)  # customer1 and customer2
 
     def test_retrieve_customer(self):
         response = self.client.get(self.customer_detail_url(self.customer1.id))
@@ -87,9 +86,8 @@ class InvoicingAPITests(APITestCase):
         self.assertEqual(created_invoice.total_tax, Decimal('20.00'))
         self.assertEqual(created_invoice.total_amount, Decimal('220.00'))
 
-
     def test_create_invoice_missing_required_fields(self):
-        invoice_data = {'customer': str(self.customer1.id)} # Missing many fields
+        invoice_data = {'customer': str(self.customer1.id)}  # Missing many fields
         response = self.client.post(self.invoices_url, invoice_data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
