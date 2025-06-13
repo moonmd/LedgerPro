@@ -3,9 +3,10 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from decimal import Decimal
 from ledgerpro.backend.api.models import (
-    User, Organization, Role, Membership, Account, Customer, Invoice, Transaction, JournalEntry, InvoiceItem
+    User, Organization, Role, Membership, Account, Customer, Invoice, Transaction, JournalEntry  # InvoiceItem removed F401
 )
 # Assuming UserDetailSerializer is available for request.user if needed, or mock authentication
+
 
 class InvoiceGLTests(APITestCase):
     def setUp(self):
@@ -27,16 +28,16 @@ class InvoiceGLTests(APITestCase):
         self.customer = Customer.objects.create(organization=self.organization, name='Test Customer GL')
 
         # URL for creating invoices
-        self.invoices_url = reverse('invoice-list-create') # Assuming this is the correct name from urls.py
+        self.invoices_url = reverse('invoice-list-create')  # Assuming this is the correct name from urls.py
 
     def test_create_invoice_sent_status_creates_gl_transaction(self):
         '''Test that creating an invoice with 'SENT' status generates a GL transaction and correct journal entries.'''
         invoice_data = {
-            'customer': str(self.customer.id), # Use UUID string
+            'customer': str(self.customer.id),  # Use UUID string
             'invoice_number': 'INV-GL-001',
             'issue_date': '2023-10-01',
             'due_date': '2023-10-31',
-            'status': Invoice.SENT, # Create as SENT
+            'status': Invoice.SENT,  # Create as SENT
             'items': [
                 {'description': 'Product A', 'quantity': Decimal('2.00'), 'unit_price': Decimal('100.00'), 'tax_amount': Decimal('10.00')},
                 {'description': 'Service B', 'quantity': Decimal('1.00'), 'unit_price': Decimal('50.00'), 'tax_amount': Decimal('0.00')}
@@ -49,10 +50,9 @@ class InvoiceGLTests(APITestCase):
             # Invoice: Subtotal = 200+50 = 250. Total Tax = 10+0 = 10. Total Amount = 260.
         }
         # Re-calculate based on assumption that 'tax_amount' is total tax for the line item
-        invoice_data['items'][0]['tax_amount'] = Decimal('20.00') # e.g. 10% on 200
+        invoice_data['items'][0]['tax_amount'] = Decimal('20.00')  # e.g. 10% on 200
         # Product A: amount 200, tax 20. Service B: amount 50, tax 0.
         # Subtotal = 250. Total Tax = 20. Total Amount = 270. This matches the comment.
-
 
         response = self.client.post(self.invoices_url, invoice_data, format='json')
 
@@ -71,22 +71,21 @@ class InvoiceGLTests(APITestCase):
         self.assertEqual(journal_entries.count(), 3, 'Should be 3 journal entries (AR, Sales, Tax).')
 
         ar_entry = journal_entries.get(account=self.ar_account)
-        self.assertEqual(ar_entry.debit_amount, Decimal('270.00')) # Total amount
+        self.assertEqual(ar_entry.debit_amount, Decimal('270.00'))  # Total amount
         self.assertEqual(ar_entry.credit_amount, Decimal('0.00'))
 
         sales_entry = journal_entries.get(account=self.sales_account)
         self.assertEqual(sales_entry.debit_amount, Decimal('0.00'))
-        self.assertEqual(sales_entry.credit_amount, Decimal('250.00')) # Subtotal
+        self.assertEqual(sales_entry.credit_amount, Decimal('250.00'))  # Subtotal
 
         tax_entry = journal_entries.get(account=self.tax_payable_account)
         self.assertEqual(tax_entry.debit_amount, Decimal('0.00'))
-        self.assertEqual(tax_entry.credit_amount, Decimal('20.00')) # Total tax
+        self.assertEqual(tax_entry.credit_amount, Decimal('20.00'))  # Total tax
 
         total_debits = sum(je.debit_amount for je in journal_entries)
         total_credits = sum(je.credit_amount for je in journal_entries)
         self.assertEqual(total_debits, total_credits, 'GL Transaction must be balanced.')
         self.assertEqual(total_debits, Decimal('270.00'))
-
 
     def test_create_invoice_draft_status_no_gl_transaction(self):
         '''Test that creating an invoice with 'DRAFT' status does NOT generate a GL transaction.'''
@@ -135,8 +134,8 @@ class InvoiceGLTests(APITestCase):
             'invoice_number': draft_invoice_data['invoice_number'],
             'issue_date': draft_invoice_data['issue_date'],
             'due_date': draft_invoice_data['due_date'],
-            'status': Invoice.SENT, # This is the key change
-            'items': draft_invoice_data['items'] # Resend items as per current serializer update logic
+            'status': Invoice.SENT,  # This is the key change
+            'items': draft_invoice_data['items']  # Resend items as per current serializer update logic
         }
 
         response_update = self.client.patch(invoice_detail_url, update_data_full, format='json')
@@ -171,7 +170,7 @@ class InvoiceGLTests(APITestCase):
             'status': Invoice.SENT,
             'items': [
                 {'description': 'Consulting', 'quantity': Decimal('10.00'), 'unit_price': Decimal('75.00'), 'tax_amount': Decimal('0.00')}
-            ] # Subtotal = 750, Tax = 0, Total = 750
+            ]  # Subtotal = 750, Tax = 0, Total = 750
         }
         response = self.client.post(self.invoices_url, invoice_data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)

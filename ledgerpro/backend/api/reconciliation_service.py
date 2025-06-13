@@ -1,10 +1,11 @@
 import logging
-from .models import StagedBankTransaction, Transaction, ReconciliationRule, Account, JournalEntry, Organization
-from django.db.models import Q, F # F is not used in the provided code, but Q is.
+from .models import StagedBankTransaction, ReconciliationRule, Account, Organization  # Removed unused Transaction, JournalEntry
 from decimal import Decimal
-from django.utils import timezone # Not explicitly used in this snippet but good for date operations
+# django.utils.timezone is Not explicitly used in this snippet but good for date operations
+# Q and F removed as they are not used
 
 logger = logging.getLogger(__name__)
+
 
 def evaluate_condition(transaction_value, operator, rule_value):
     '''Evaluates a single condition.'''
@@ -16,12 +17,11 @@ def evaluate_condition(transaction_value, operator, rule_value):
             # If both are successfully converted to Decimal, use them for comparison
             transaction_value = transaction_value_decimal
             rule_value = rule_value_decimal
-        except:
+        except Exception:  # Specified exception
             # Could not convert both to Decimal, fall back to string or original type comparison
             pass
-    elif isinstance(transaction_value, str): # Ensure rule_value is also string for string operations
+    elif isinstance(transaction_value, str):  # Ensure rule_value is also string for string operations
         rule_value = str(rule_value)
-
 
     if operator == 'contains':
         return str(rule_value).lower() in str(transaction_value).lower()
@@ -29,11 +29,11 @@ def evaluate_condition(transaction_value, operator, rule_value):
         return str(rule_value).lower() not in str(transaction_value).lower()
     elif operator == 'equals':
         # Handle case where one is Decimal and other is int/float after conversion attempt
-        if isinstance(transaction_value, Decimal) and isinstance(rule_value, (int,float)):
+        if isinstance(transaction_value, Decimal) and isinstance(rule_value, (int, float)):
             return transaction_value == Decimal(str(rule_value))
         return transaction_value == rule_value
     elif operator == 'not_equals':
-        if isinstance(transaction_value, Decimal) and isinstance(rule_value, (int,float)):
+        if isinstance(transaction_value, Decimal) and isinstance(rule_value, (int, float)):
             return transaction_value != Decimal(str(rule_value))
         return transaction_value != rule_value
     elif operator == 'greater_than':
@@ -46,20 +46,21 @@ def evaluate_condition(transaction_value, operator, rule_value):
     logger.debug(f"Unsupported operator: {operator} or incompatible types for value: {transaction_value} and rule value: {rule_value}")
     return False
 
+
 def check_rule_conditions(staged_tx: StagedBankTransaction, rule: ReconciliationRule):
     '''Checks if a staged transaction matches all conditions of a rule.'''
     if not rule.conditions or not isinstance(rule.conditions, list):
         logger.warning(f"Rule {rule.name} (ID: {rule.id}) has no conditions or conditions are malformed.")
         return False
 
-    for condition in rule.conditions: # conditions is a list of dicts
+    for condition in rule.conditions:  # conditions is a list of dicts
         field_name = condition.get('field')
         operator = condition.get('operator')
         value = condition.get('value')
 
         if not field_name or not operator:
             logger.warning(f"Skipping malformed condition in Rule {rule.name}: {condition}")
-            continue # Or treat as failure for the rule? For now, skip malformed condition.
+            continue  # Or treat as failure for the rule? For now, skip malformed condition.
 
         if not hasattr(staged_tx, field_name):
             logger.warning(f'Rule {rule.name} references invalid field \'{field_name}\' on StagedBankTransaction.')
@@ -68,8 +69,9 @@ def check_rule_conditions(staged_tx: StagedBankTransaction, rule: Reconciliation
         transaction_value = getattr(staged_tx, field_name)
 
         if not evaluate_condition(transaction_value, operator, value):
-            return False # One condition failed, rule does not match
-    return True # All conditions passed
+            return False  # One condition failed, rule does not match
+    return True  # All conditions passed
+
 
 def apply_rule_actions(staged_tx: StagedBankTransaction, rule: ReconciliationRule, user):
     '''Applies the actions of a matched rule to a staged transaction.'''
@@ -94,10 +96,10 @@ def apply_rule_actions(staged_tx: StagedBankTransaction, rule: ReconciliationRul
                 # 2. Create a Transaction
                 # 3. Create JournalEntry for debit and credit
                 # For example:
-                # bank_gl_account = ... # logic to find the GL account representing the bank account of staged_tx
-                # if staged_tx.amount < 0: # Expense or Asset use
+                # bank_gl_account = ...  # logic to find the GL account representing the bank account of staged_tx
+                # if staged_tx.amount < 0:  # Expense or Asset use
                 #    debit_account, credit_account = target_account, bank_gl_account
-                # else: # Income or Liability increase
+                # else:  # Income or Liability increase
                 #    debit_account, credit_account = bank_gl_account, target_account
                 # ledger_tx = Transaction.objects.create(organization=organization, date=staged_tx.date, description=f"Auto-created by rule: {rule.name} for bank tx: {staged_tx.name}", created_by=user)
                 # JournalEntry.objects.create(transaction=ledger_tx, account=debit_account, debit_amount=abs(staged_tx.amount))
@@ -119,7 +121,7 @@ def run_reconciliation_rules_for_organization(organization: Organization, user):
     unmatched_transactions = StagedBankTransaction.objects.filter(
         organization=organization,
         reconciliation_status=StagedBankTransaction.RECON_UNMATCHED
-    )[:100] # Example: Limit to 100 per run to avoid timeouts in web requests
+    )[:100]  # Example: Limit to 100 per run to avoid timeouts in web requests
 
     applied_count = 0
     for tx in unmatched_transactions:
@@ -127,10 +129,11 @@ def run_reconciliation_rules_for_organization(organization: Organization, user):
             if check_rule_conditions(tx, rule):
                 apply_rule_actions(tx, rule, user)
                 applied_count += 1
-                break # Move to next transaction once a rule has been applied
+                break  # Move to next transaction once a rule has been applied
 
     logger.info(f'{applied_count} rules applied for organization {organization.name}.')
     return applied_count
+
 
 def find_suggested_matches(staged_tx: StagedBankTransaction, threshold_days=7, amount_tolerance_percent=1.0):
     '''Suggests potential matches from existing LedgerPro Transactions.'''

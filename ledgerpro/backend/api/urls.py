@@ -13,7 +13,7 @@ from .views import (
     ReconciliationRuleViewSet, ReconciliationRuleDetailView, ApplyReconciliationRulesView,
     StagedBankTransactionDetailView,
     ProfitAndLossView, BalanceSheetView,
-    InvoiceSendEmailView, # Added for send email action
+    InvoiceSendEmailView,  # Added for send email action
     # Payroll Views
     EmployeeViewSet, DeductionTypeViewSet, PayRunViewSet, PayslipListView, PayslipDetailView,
     # New views for staged bank transactions
@@ -52,8 +52,8 @@ urlpatterns = [
     path('customers/', CustomerViewSet.as_view(), name='customer-list-create'),
     path('customers/<uuid:pk>/', CustomerDetailView.as_view(), name='customer-detail'),
     path('invoices/', InvoiceViewSet.as_view(), name='invoice-list-create'),
-    path('invoices/<uuid:pk>/', InvoiceDetailView.as_view(), name='invoice-detail'), # Handles GET, PUT, DELETE for InvoiceDetailView
-    path('invoices/<uuid:pk>/send-email/', InvoiceSendEmailView.as_view(), name='invoice-send-email'), # Corrected to use InvoiceSendEmailView
+    path('invoices/<uuid:pk>/', InvoiceDetailView.as_view(), name='invoice-detail'),  # Handles GET, PUT, DELETE for InvoiceDetailView
+    path('invoices/<uuid:pk>/send-email/', InvoiceSendEmailView.as_view(), name='invoice-send-email'),  # Corrected to use InvoiceSendEmailView
     path('vendors/', VendorViewSet.as_view(), name='vendor-list-create'),
     path('vendors/<uuid:pk>/', VendorDetailView.as_view(), name='vendor-detail'),
 
@@ -68,8 +68,8 @@ urlpatterns = [
     path('bank/staged-transactions/<uuid:pk>/create-ledger-transaction/', StagedBankTransactionCreateLedgerView.as_view(), name='staged-bank-transaction-create-ledger'),
     path('bank/manual-import/', ManualBankStatementImportView.as_view(), name='manual-bank-statement-import'),
 
-    path('bank/reconciliation-rules/', ReconciliationRuleViewSet.as_view(), name='recon-rule-list-create'), # Assuming ListCreateAPIView
-    path('bank/reconciliation-rules/<uuid:pk>/', ReconciliationRuleDetailView.as_view(), name='recon-rule-detail'), # Assuming RetrieveUpdateDestroyAPIView
+    path('bank/reconciliation-rules/', ReconciliationRuleViewSet.as_view(), name='recon-rule-list-create'),  # Assuming ListCreateAPIView
+    path('bank/reconciliation-rules/<uuid:pk>/', ReconciliationRuleDetailView.as_view(), name='recon-rule-detail'),  # Assuming RetrieveUpdateDestroyAPIView
     path('bank/apply-reconciliation-rules/', ApplyReconciliationRulesView.as_view(), name='apply-recon-rules'),
 
     path('reports/profit-and-loss/', ProfitAndLossView.as_view(), name='report-profit-and-loss'),
@@ -80,5 +80,5 @@ urlpatterns = [
     path('payslips/<uuid:pk>/', PayslipDetailView.as_view(), name='payslip-detail'),
 
     # Include router paths for ViewSets
-    path('', include(router.urls)), # This should typically be last or prefixed e.g. path('api/v1/', include(router.urls))
+    path('', include(router.urls)),  # This should typically be last or prefixed e.g. path('api/v1/', include(router.urls))
 ]

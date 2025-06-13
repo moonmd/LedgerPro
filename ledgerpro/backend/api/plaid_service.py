@@ -1,5 +1,4 @@
-import os
-from plaid import ApiException as PlaidApiException # Corrected import
+from plaid import ApiException as PlaidApiException  # Corrected import
 from plaid.api import plaid_api
 from plaid.model.link_token_create_request import LinkTokenCreateRequest
 from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
@@ -8,11 +7,12 @@ from plaid.model.transactions_sync_request import TransactionsSyncRequest
 from plaid.model.country_code import CountryCode as PlaidCountryCode
 from plaid.model.products import Products as PlaidProducts
 from django.conf import settings
-from django.utils import timezone # Added for timezone.now()
+from django.utils import timezone  # Added for timezone.now()
 import logging
 from .models import PlaidItem, StagedBankTransaction, Organization
 
 logger = logging.getLogger(__name__)
+
 
 def get_plaid_client():
     # Map PLAID_ENV to Plaid API environments
@@ -30,7 +30,7 @@ def get_plaid_client():
         plaid_secret = settings.PLAID_SECRET_DEVELOPMENT
     # elif settings.PLAID_ENV == 'production':
         # plaid_secret = settings.PLAID_SECRET_PRODUCTION # Uncomment for production
-    else: # Default to sandbox
+    else:  # Default to sandbox
         plaid_secret = settings.PLAID_SECRET_SANDBOX
 
     if not settings.PLAID_CLIENT_ID or not plaid_secret:
@@ -46,6 +46,7 @@ def get_plaid_client():
     )
     api_client = plaid_api.ApiClient(configuration)
     return plaid_api.PlaidApi(api_client)
+
 
 def create_link_token(user_id_str: str, organization: Organization):
     '''Generates a link_token for the Plaid Link frontend component.'''
@@ -63,10 +64,10 @@ def create_link_token(user_id_str: str, organization: Organization):
 
         request = LinkTokenCreateRequest(
             user=LinkTokenCreateRequestUser(client_user_id=user_id_str),
-            client_name='LedgerPro', # Consider making this configurable
+            client_name='LedgerPro',  # Consider making this configurable
             products=request_products,
             country_codes=request_country_codes,
-            language='en', # Consider making this configurable
+            language='en',  # Consider making this configurable
             redirect_uri=settings.PLAID_REDIRECT_URI if settings.PLAID_REDIRECT_URI else None,
         )
         response = client.link_token_create(request)
@@ -75,7 +76,7 @@ def create_link_token(user_id_str: str, organization: Organization):
     except PlaidApiException as e:
         logger.error(f'Plaid API error creating link token for org {organization.name}: {e.body}')
         return None
-    except ValueError as ve: # Catch configuration errors from get_plaid_client
+    except ValueError as ve:  # Catch configuration errors from get_plaid_client
         logger.error(f'Configuration error for Plaid: {ve}')
         return None
     except Exception as e:
@@ -99,11 +100,11 @@ def exchange_public_token(public_token: str, user, organization: Organization, i
             item_id=item_id,
             defaults={
                 'user': user,
-                'access_token': access_token, # IMPORTANT: Encrypt this in a real app
+                'access_token': access_token,  # IMPORTANT: Encrypt this in a real app
                 'institution_id': institution_id,
                 'institution_name': institution_name,
-                'last_successful_sync': None, # Initialize sync time
-                'sync_cursor': None, # Initialize cursor
+                'last_successful_sync': None,  # Initialize sync time
+                'sync_cursor': None,  # Initialize cursor
             }
         )
         logger.info(f'Plaid item {("created" if created else "updated")} for org {organization.name}, item_id: {item_id}')
@@ -111,12 +112,13 @@ def exchange_public_token(public_token: str, user, organization: Organization, i
     except PlaidApiException as e:
         logger.error(f'Plaid API error exchanging public token for org {organization.name}: {e.body}')
         return None
-    except ValueError as ve: # Catch configuration errors
+    except ValueError as ve:  # Catch configuration errors
         logger.error(f'Configuration error for Plaid: {ve}')
         return None
     except Exception as e:
         logger.error(f'Unexpected error exchanging public token for org {organization.name}: {e}')
         return None
+
 
 def fetch_plaid_transactions(plaid_item: PlaidItem):
     '''Fetches transactions for a given PlaidItem.'''
@@ -126,7 +128,7 @@ def fetch_plaid_transactions(plaid_item: PlaidItem):
 
         request = TransactionsSyncRequest(
             access_token=plaid_item.access_token,
-            cursor=plaid_item.sync_cursor if plaid_item.sync_cursor else None # Pass None if cursor is empty/null
+            cursor=plaid_item.sync_cursor if plaid_item.sync_cursor else None  # Pass None if cursor is empty/null
         )
         response = client.transactions_sync(request)
 
@@ -145,12 +147,12 @@ def fetch_plaid_transactions(plaid_item: PlaidItem):
 
             _, created = StagedBankTransaction.objects.update_or_create(
                 organization=plaid_item.organization,
-                transaction_id_source=tx_data['transaction_id'], # Plaid's unique transaction ID
+                transaction_id_source=tx_data['transaction_id'],  # Plaid's unique transaction ID
                 defaults={
                     'plaid_item': plaid_item,
                     'account_id_source': tx_data['account_id'],
                     'date': tx_data['date'],
-                    'posted_date': tx_data.get('authorized_date'), # Or use 'datetime'
+                    'posted_date': tx_data.get('authorized_date'),  # Or use 'datetime'
                     'name': tx_data['name'],
                     'merchant_name': tx_data.get('merchant_name'),
                     'amount': amount,
@@ -163,7 +165,7 @@ def fetch_plaid_transactions(plaid_item: PlaidItem):
                 }
             )
             if created:
-                added_count +=1
+                added_count += 1
 
         plaid_item.sync_cursor = response.get('next_cursor')
         plaid_item.last_successful_sync = timezone.now()
@@ -174,7 +176,7 @@ def fetch_plaid_transactions(plaid_item: PlaidItem):
     except PlaidApiException as e:
         logger.error(f'Plaid API error fetching transactions for item {plaid_item.item_id}: {e.body}')
         return -1
-    except ValueError as ve: # Catch configuration errors
+    except ValueError as ve:  # Catch configuration errors
         logger.error(f'Configuration error for Plaid: {ve}')
         return -1
     except Exception as e:
