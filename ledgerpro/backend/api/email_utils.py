@@ -1,11 +1,10 @@
-import os
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from django.conf import settings
-from django.template.loader import render_to_string
 import logging
 
 logger = logging.getLogger(__name__)
+
 
 def send_email(to_email, subject, html_content, from_email=None):
     if from_email is None:
@@ -16,7 +15,7 @@ def send_email(to_email, subject, html_content, from_email=None):
         # In a real app, you might raise an error or handle this differently.
         # For dev, we might just log and return True to not block flow.
         print(f'SIMULATED EMAIL: To: {to_email}, Subject: {subject}, Body:\n{html_content}')
-        return True # Simulate success if no key
+        return True  # Simulate success if no key
 
     message = Mail(
         from_email=from_email,
@@ -28,10 +27,11 @@ def send_email(to_email, subject, html_content, from_email=None):
         sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
         response = sg.send(message)
         logger.info(f'Email sent to {to_email}, status code: {response.status_code}')
-        return response.status_code in [200, 202] # 202 Accepted
+        return response.status_code in [200, 202]  # 202 Accepted
     except Exception as e:
         logger.error(f'Error sending email to {to_email}: {e}')
         return False
+
 
 def send_invoice_email(invoice):
     # Prepare context for the email template
@@ -46,7 +46,7 @@ def send_invoice_email(invoice):
         'total_amount': invoice.total_amount,
         'items': invoice.items.all(),
         'organization_name': invoice.organization.name,
-        'view_invoice_url': f'https://app.ledgerpro.example.com/invoices/{invoice.id}' # Placeholder URL
+        'view_invoice_url': f'https://app.ledgerpro.example.com/invoices/{invoice.id}'  # Placeholder URL
     }
 
     # Render HTML content from a template

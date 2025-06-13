@@ -1,14 +1,14 @@
-from django.urls import reverse
-from rest_framework import status
-from rest_framework.test import APITestCase
 from decimal import Decimal
 from ledgerpro.backend.api.models import (
     User, Organization, Role, Membership, Account, Employee, DeductionType, PayRun, Transaction, JournalEntry, Payslip
 )
-from ledgerpro.backend.api.payroll_service import process_pay_run, calculate_gross_pay # For direct service testing
-from datetime import date # Added for date objects in new tests
+from ledgerpro.backend.api.payroll_service import process_pay_run, calculate_gross_pay  # For direct service testing
+from datetime import date  # Added for date objects in new tests
+from django.test import TestCase  # Moved APITestCase to TestCase as no API calls are made directly here for now
+# from unittest import mock # For mocking, if needed for service calls - F401 unused
 
-class PayrollGLTests(APITestCase):
+
+class PayrollGLTests(TestCase):  # Changed to TestCase
     def setUp(self):
         # Create user, organization, role, membership
         self.user = User.objects.create_user(email='payrolluser@example.com', password='password123', first_name='Payroll', last_name='User')
@@ -16,7 +16,7 @@ class PayrollGLTests(APITestCase):
         self.role = Role.objects.create(name='PayrollManager')
         Membership.objects.create(user=self.user, organization=self.organization, role=self.role)
 
-        self.client.login(email='payrolluser@example.com', password='password123')
+        # No client.login needed if not making API calls
 
         # Create default accounts (as expected by _get_or_create_payroll_account)
         self.payroll_expense_account = Account.objects.create(organization=self.organization, name='Payroll Expenses (Default)', type=Account.EXPENSE)
@@ -29,14 +29,14 @@ class PayrollGLTests(APITestCase):
             first_name='John',
             last_name='Doe',
             pay_type=Employee.SALARY,
-            pay_rate=Decimal('52000.00') # Annual salary, implies 2000 bi-weekly if 26 periods
+            pay_rate=Decimal('52000.00')  # Annual salary, implies 2000 bi-weekly if 26 periods
         )
         self.employee2 = Employee.objects.create(
             organization=self.organization,
             first_name='Jane',
             last_name='Smith',
             pay_type=Employee.HOURLY,
-            pay_rate=Decimal('25.00') # Hourly rate
+            pay_rate=Decimal('25.00')  # Hourly rate
         )
 
         # Create a deduction type
@@ -120,41 +120,44 @@ class PayrollGLTests(APITestCase):
     def test_calculate_gross_pay_edge_cases(self):
         # Salaried employee from setUp: 52000/year
         self.assertEqual(
-            calculate_gross_pay(self.employee1, date(2023,1,1), date(2023,1,15)),
-            Decimal('2000.00') # 52000 / 26
+            calculate_gross_pay(self.employee1, date(2023, 1, 1), date(2023, 1, 15)),
+            Decimal('2000.00')  # 52000 / 26
         )
 
         # Hourly employee from setUp: 25/hr
         self.assertEqual(
-            calculate_gross_pay(self.employee2, date(2023,1,1), date(2023,1,15), hours_worked=Decimal('0.00')),
+            calculate_gross_pay(self.employee2, date(2023, 1, 1), date(2023, 1, 15), hours_worked=Decimal('0.00')),
             Decimal('0.00')
         )
         self.assertEqual(
-            calculate_gross_pay(self.employee2, date(2023,1,1), date(2023,1,15), hours_worked=Decimal('1.00')),
+            calculate_gross_pay(self.employee2, date(2023, 1, 1), date(2023, 1, 15), hours_worked=Decimal('1.00')),
             Decimal('25.00')
         )
-        with self.assertRaises(ValueError): # Hourly employee needs hours
-            calculate_gross_pay(self.employee2, date(2023,1,1), date(2023,1,15))
+        # payroll_service.calculate_gross_pay now defaults hours_worked to 0 if None for hourly, and logs a warning.
+        # So, direct call without hours will result in 0 pay.
+        self.assertEqual(
+            calculate_gross_pay(self.employee2, date(2023, 1, 1), date(2023, 1, 15)),
+            Decimal('0.00')  # Expect 0 due to default hours_worked=0
+        )
 
         # Employee with zero pay rate
         zero_rate_salary_emp = Employee.objects.create(organization=self.organization, first_name='Zero', last_name='RateS', pay_type=Employee.SALARY, pay_rate=Decimal('0.00'))
         self.assertEqual(
-            calculate_gross_pay(zero_rate_salary_emp, date(2023,1,1), date(2023,1,15)),
+            calculate_gross_pay(zero_rate_salary_emp, date(2023, 1, 1), date(2023, 1, 15)),
             Decimal('0.00')
         )
         zero_rate_hourly_emp = Employee.objects.create(organization=self.organization, first_name='Zero', last_name='RateH', pay_type=Employee.HOURLY, pay_rate=Decimal('0.00'))
         self.assertEqual(
-            calculate_gross_pay(zero_rate_hourly_emp, date(2023,1,1), date(2023,1,15), hours_worked=Decimal('40.00')),
+            calculate_gross_pay(zero_rate_hourly_emp, date(2023, 1, 1), date(2023, 1, 15), hours_worked=Decimal('40.00')),
             Decimal('0.00')
         )
 
-
-    def test_process_pay_run_no_deductions(self): # Replaces previous test_payrun_with_no_deductions
+    def test_process_pay_run_no_deductions(self):  # Replaces previous test_payrun_with_no_deductions
         pay_run = PayRun.objects.create(
             organization=self.organization, pay_period_start_date='2023-10-01',
             pay_period_end_date='2023-10-15', payment_date='2023-10-20', status=PayRun.DRAFT
         )
-        employee_inputs = [{'employee_id': str(self.employee1.id), 'manual_deductions': []}] # Salary: 2000 gross
+        employee_inputs = [{'employee_id': str(self.employee1.id), 'manual_deductions': []}]  # Salary: 2000 gross
 
         processed_pay_run = process_pay_run(pay_run, employee_inputs, self.user)
         self.assertEqual(processed_pay_run.status, PayRun.COMPLETED)
@@ -167,13 +170,12 @@ class PayrollGLTests(APITestCase):
         gl_transaction = processed_pay_run.gl_transaction
         self.assertIsNotNone(gl_transaction)
         journal_entries = JournalEntry.objects.filter(transaction=gl_transaction)
-        self.assertEqual(journal_entries.count(), 2) # Payroll Expense, Wages Payable
+        self.assertEqual(journal_entries.count(), 2)  # Payroll Expense, Wages Payable
         self.assertEqual(journal_entries.get(account=self.payroll_expense_account).debit_amount, Decimal('2000.00'))
         self.assertEqual(journal_entries.get(account=self.wages_payable_account).credit_amount, Decimal('2000.00'))
         self.assertFalse(JournalEntry.objects.filter(transaction=gl_transaction, account=self.deductions_payable_account).exists())
 
-
-    def test_process_pay_run_employee_not_found(self): # Replaces previous test_payrun_with_no_employees_processed
+    def test_process_pay_run_employee_not_found(self):  # Replaces previous test_payrun_with_no_employees_processed
         pay_run = PayRun.objects.create(
             organization=self.organization, pay_period_start_date='2023-09-01',
             pay_period_end_date='2023-09-15', payment_date='2023-09-20', status=PayRun.DRAFT
@@ -188,12 +190,11 @@ class PayrollGLTests(APITestCase):
             process_pay_run(pay_run, employee_inputs, self.user)
         self.assertIn("No employee data processed", str(context.exception))
 
-        pay_run.refresh_from_db() # Check DB status after the exception
-        self.assertEqual(pay_run.status, PayRun.DRAFT) # Should be reverted to DRAFT
+        pay_run.refresh_from_db()  # Check DB status after the exception
+        self.assertEqual(pay_run.status, PayRun.DRAFT)  # Should be reverted to DRAFT
         self.assertEqual(Payslip.objects.filter(pay_run=pay_run).count(), 0)
         self.assertIsNone(pay_run.gl_transaction)
         self.assertEqual(Transaction.objects.count(), initial_tx_count)
-
 
     def test_process_pay_run_invalid_deduction_type(self):
         pay_run = PayRun.objects.create(
@@ -203,7 +204,7 @@ class PayrollGLTests(APITestCase):
         non_existent_ded_uuid = '11111111-1111-1111-1111-111111111111'
         employee_inputs = [
             {
-                'employee_id': str(self.employee1.id), # Salary: 2000
+                'employee_id': str(self.employee1.id),  # Salary: 2000
                 'manual_deductions': [
                     {'deduction_type_id': non_existent_ded_uuid, 'amount': '50.00'}
                 ]

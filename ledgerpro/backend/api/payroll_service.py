@@ -1,14 +1,15 @@
 import logging
 from .models import (
-    Employee, PayRun, Payslip, PayslipDeduction, DeductionType, Organization,
-    Account, Transaction, JournalEntry # Added Account, Transaction, JournalEntry
+    Employee, PayRun, Payslip, PayslipDeduction, DeductionType,
+    Account, Transaction, JournalEntry  # Added Account, Transaction, JournalEntry
 )
 from decimal import Decimal
 from django.utils import timezone
-from django.db import transaction as db_transaction # For atomic operations
-from .account_utils import get_or_create_default_account # Added import
+from django.db import transaction as db_transaction  # For atomic operations
+from .account_utils import get_or_create_default_account  # Added import
 
 logger = logging.getLogger(__name__)
+
 
 # _get_or_create_payroll_account method removed, will use centralized utility
 
@@ -20,7 +21,7 @@ def calculate_gross_pay(employee: Employee, pay_period_start_date, pay_period_en
     elif employee.pay_type == Employee.HOURLY:
         if hours_worked is None:
             logger.warning(f"Hours worked not provided for hourly employee {employee.id}. Assuming 0 hours for safety.")
-            hours_worked = Decimal('0.00') # Default to 0 if not provided.
+            hours_worked = Decimal('0.00')  # Default to 0 if not provided.
         else:
             hours_worked = Decimal(str(hours_worked))
         gross = employee.pay_rate * hours_worked
@@ -30,7 +31,7 @@ def calculate_gross_pay(employee: Employee, pay_period_start_date, pay_period_en
 
 @db_transaction.atomic
 def process_pay_run(pay_run: PayRun, employee_inputs: list, user):
-    if pay_run.status not in [PayRun.DRAFT, PayRun.PROCESSING]: # Allow reprocessing from PROCESSING
+    if pay_run.status not in [PayRun.DRAFT, PayRun.PROCESSING]:  # Allow reprocessing from PROCESSING
         raise ValueError(f'PayRun must be in DRAFT or PROCESSING status to process. Current status: {pay_run.status}')
 
     initial_status = pay_run.status
@@ -46,7 +47,7 @@ def process_pay_run(pay_run: PayRun, employee_inputs: list, user):
         employee_id = emp_input.get('employee_id')
         if not employee_id:
             logger.warning(f"Skipping employee input due to missing 'employee_id': {emp_input}")
-            continue # Or handle error more strictly
+            continue  # Or handle error more strictly
         try:
             employee = Employee.objects.get(id=employee_id, organization=pay_run.organization, is_active=True)
         except Employee.DoesNotExist:
@@ -59,12 +60,19 @@ def process_pay_run(pay_run: PayRun, employee_inputs: list, user):
 
         payslip, created = Payslip.objects.update_or_create(
             pay_run=pay_run, employee=employee,
-            defaults={
-                'gross_pay': gross_pay,
-                'notes': f'Hours: {hours}' if hours is not None else (payslip.notes if not created else '')
-            }
+            defaults={'gross_pay': gross_pay}  # Only gross_pay in defaults initially
         )
-        if not created: # Clear previous deductions if reprocessing
+
+        if hours is not None:
+            payslip.notes = f'Hours: {hours}'
+            payslip.save(update_fields=['notes'])  # Save if hours were provided
+        elif created:  # No hours provided, and it's a new payslip
+            payslip.notes = ''  # Default for new payslips
+            payslip.save(update_fields=['notes'])
+        # If 'not created' (updated) and 'hours is None', we don't touch 'payslip.notes', preserving its value.
+
+        logger.info(f'Payslip {payslip.id} processed.')  # Comment spacing fixed
+        if not created:  # Clear previous deductions if reprocessing
             payslip.deductions_applied.all().delete()
 
         manual_deductions_data = emp_input.get('manual_deductions', [])
@@ -78,8 +86,8 @@ def process_pay_run(pay_run: PayRun, employee_inputs: list, user):
                 ded_type = DeductionType.objects.get(id=ded_type_id, organization=pay_run.organization, is_active=True)
                 ded_amount = Decimal(str(ded_amount_str)).quantize(Decimal('0.01'))
                 if ded_amount < Decimal('0.00'):
-                     logger.warning(f"Negative deduction amount {ded_amount} for {ded_type.name} not allowed. Skipping.")
-                     continue
+                    logger.warning(f"Negative deduction amount {ded_amount} for {ded_type.name} not allowed. Skipping.")
+                    continue
                 PayslipDeduction.objects.create(payslip=payslip, deduction_type=ded_type, amount=ded_amount)
                 current_payslip_total_deductions += ded_amount
                 agg_key = ded_type.name
@@ -92,13 +100,13 @@ def process_pay_run(pay_run: PayRun, employee_inputs: list, user):
         payslip.total_deductions = current_payslip_total_deductions
         payslip.net_pay = gross_pay - current_payslip_total_deductions
         payslip.save()
-        processed_payslips_for_gl.append(payslip) # Add to list for GL summary
+        processed_payslips_for_gl.append(payslip)  # Add to list for GL summary
 
         total_run_gross_pay += gross_pay
         total_run_net_pay += payslip.net_pay
 
-    if not processed_payslips_for_gl: # If no employees were processed successfully
-        pay_run.status = initial_status # Revert to original status (e.g. DRAFT)
+    if not processed_payslips_for_gl:  # If no employees were processed successfully
+        pay_run.status = initial_status  # Revert to original status (e.g. DRAFT)
         pay_run.notes = f'{pay_run.notes or ""}Processing failed: No valid employee data processed.'.strip()
         pay_run.save()
         logger.warning(f'PayRun {pay_run.id} processing resulted in no payslips. Status reverted to {initial_status}.')
@@ -131,7 +139,7 @@ def process_pay_run(pay_run: PayRun, employee_inputs: list, user):
 
     current_debits = sum(je.debit_amount for je in gl_transaction.journal_entries_set.all())
     current_credits = sum(je.credit_amount for je in gl_transaction.journal_entries_set.all())
-    if abs(current_debits - current_credits) > Decimal('0.005'): # Tolerance for small rounding
+    if abs(current_debits - current_credits) > Decimal('0.005'):  # Tolerance for small rounding
         logger.error(f'GL Transaction for PayRun {pay_run.id} is unbalanced! Debits: {current_debits}, Credits: {current_credits}. Rolling back.')
         raise ValueError(f'Failed to create a balanced GL transaction for the pay run. Difference: {current_debits - current_credits}')
 

@@ -1,8 +1,9 @@
 from django.test import TestCase
 from django.core.exceptions import ValidationError
 from decimal import Decimal
-from datetime import date, timedelta
+from datetime import date  # timedelta removed (F401)
 from ledgerpro.backend.api.models import Organization, Account, Transaction, JournalEntry, User
+
 
 class CoreAccountingModelTests(TestCase):
     def setUp(self):
@@ -27,7 +28,7 @@ class CoreAccountingModelTests(TestCase):
         JournalEntry.objects.create(transaction=tx1, account=self.revenue_acc, credit_amount=Decimal('1000.00'))
 
         self.assertEqual(self.asset_acc.get_balance(date_to=tx1_date), Decimal('1000.00'))
-        self.assertEqual(self.revenue_acc.get_balance(date_to=tx1_date), Decimal('1000.00')) # Revenue accounts increase with credit
+        self.assertEqual(self.revenue_acc.get_balance(date_to=tx1_date), Decimal('1000.00'))  # Revenue accounts increase with credit
 
         # Another transaction: Debit Expense, Credit Asset
         tx2_date = date(2023, 1, 10)
@@ -35,8 +36,8 @@ class CoreAccountingModelTests(TestCase):
         JournalEntry.objects.create(transaction=tx2, account=self.expense_acc, debit_amount=Decimal('50.00'))
         JournalEntry.objects.create(transaction=tx2, account=self.asset_acc, credit_amount=Decimal('50.00'))
 
-        self.assertEqual(self.asset_acc.get_balance(date_to=tx2_date), Decimal('950.00')) # 1000 - 50
-        self.assertEqual(self.expense_acc.get_balance(date_to=tx2_date), Decimal('50.00')) # Expense accounts increase with debit
+        self.assertEqual(self.asset_acc.get_balance(date_to=tx2_date), Decimal('950.00'))  # 1000 - 50
+        self.assertEqual(self.expense_acc.get_balance(date_to=tx2_date), Decimal('50.00'))  # Expense accounts increase with debit
 
         # Test balance as of a date between transactions
         self.assertEqual(self.asset_acc.get_balance(date_to=date(2023, 1, 7)), Decimal('1000.00'))
@@ -44,20 +45,19 @@ class CoreAccountingModelTests(TestCase):
         # Test balance with no activity up to a date
         self.assertEqual(self.liability_acc.get_balance(date_to=date(2023, 1, 15)), Decimal('0.00'))
 
-
     def test_account_period_activity(self):
         # Setup transactions across different periods
         tx_jan5 = Transaction.objects.create(organization=self.organization, date=date(2023, 1, 5), description='Jan Sale', created_by=self.user)
-        JournalEntry.objects.create(transaction=tx_jan5, account=self.revenue_acc, credit_amount=Decimal('200.00')) # Rev: +200
-        JournalEntry.objects.create(transaction=tx_jan5, account=self.asset_acc, debit_amount=Decimal('200.00'))   # Asset: +200
+        JournalEntry.objects.create(transaction=tx_jan5, account=self.revenue_acc, credit_amount=Decimal('200.00'))  # Rev: +200
+        JournalEntry.objects.create(transaction=tx_jan5, account=self.asset_acc, debit_amount=Decimal('200.00'))  # Asset: +200
 
         tx_jan15 = Transaction.objects.create(organization=self.organization, date=date(2023, 1, 15), description='Jan Expense', created_by=self.user)
         JournalEntry.objects.create(transaction=tx_jan15, account=self.expense_acc, debit_amount=Decimal('30.00'))  # Exp: +30
-        JournalEntry.objects.create(transaction=tx_jan15, account=self.asset_acc, credit_amount=Decimal('30.00')) # Asset: -30 (Net +170)
+        JournalEntry.objects.create(transaction=tx_jan15, account=self.asset_acc, credit_amount=Decimal('30.00'))  # Asset: -30 (Net +170)
 
         tx_feb5 = Transaction.objects.create(organization=self.organization, date=date(2023, 2, 5), description='Feb Sale', created_by=self.user)
-        JournalEntry.objects.create(transaction=tx_feb5, account=self.revenue_acc, credit_amount=Decimal('500.00')) # Rev: +500
-        JournalEntry.objects.create(transaction=tx_feb5, account=self.asset_acc, debit_amount=Decimal('500.00'))   # Asset: +500 (Net +670)
+        JournalEntry.objects.create(transaction=tx_feb5, account=self.revenue_acc, credit_amount=Decimal('500.00'))  # Rev: +500
+        JournalEntry.objects.create(transaction=tx_feb5, account=self.asset_acc, debit_amount=Decimal('500.00'))  # Asset: +500 (Net +670)
 
         # Test P&L accounts for January
         jan_start, jan_end = date(2023, 1, 1), date(2023, 1, 31)
@@ -67,11 +67,10 @@ class CoreAccountingModelTests(TestCase):
         # Test P&L accounts for February
         feb_start, feb_end = date(2023, 2, 1), date(2023, 2, 28)
         self.assertEqual(self.revenue_acc.get_period_activity(feb_start, feb_end), Decimal('500.00'))
-        self.assertEqual(self.expense_acc.get_period_activity(feb_start, feb_end), Decimal('0.00')) # No expense in Feb
+        self.assertEqual(self.expense_acc.get_period_activity(feb_start, feb_end), Decimal('0.00'))  # No expense in Feb
 
         # Test Asset account activity for January (should be +200 - 30 = 170)
         self.assertEqual(self.asset_acc.get_period_activity(jan_start, jan_end), Decimal('170.00'))
-
 
     def test_journal_entry_validation(self):
         tx = Transaction.objects.create(organization=self.organization, date=date.today(), description='Test JE Validation', created_by=self.user)

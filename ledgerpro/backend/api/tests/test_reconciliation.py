@@ -1,17 +1,18 @@
 from django.urls import reverse
-from django.test import TestCase # Changed from APITestCase for ReconciliationServiceTests
+from django.test import TestCase  # Changed from APITestCase for ReconciliationServiceTests
 from rest_framework import status
-from rest_framework.test import APITestCase # Keep for ReconciliationAPITests
+from rest_framework.test import APITestCase  # Keep for ReconciliationAPITests
 from unittest import mock
 from decimal import Decimal
 from datetime import date
 
 from ledgerpro.backend.api.models import (
-    User, Organization, Role, Membership, Account, StagedBankTransaction, ReconciliationRule, Transaction
+    User, Organization, Role, Membership, Account, StagedBankTransaction, ReconciliationRule  # Transaction removed F401
 )
 from ledgerpro.backend.api.reconciliation_service import (
     evaluate_condition, check_rule_conditions, apply_rule_actions, run_reconciliation_rules_for_organization
 )
+
 
 class ReconciliationServiceTests(TestCase):
     def setUp(self):
@@ -28,7 +29,6 @@ class ReconciliationServiceTests(TestCase):
         self.assertTrue(evaluate_condition(Decimal('-10.00'), 'greater_than', Decimal('-15.00')))
         self.assertTrue(evaluate_condition(Decimal('-20.00'), 'less_than', Decimal('-15.00')))
         self.assertTrue(evaluate_condition('Completed', 'equals', 'Completed'))
-
 
     def test_check_rule_conditions(self):
         tx_data = {
@@ -65,7 +65,7 @@ class ReconciliationServiceTests(TestCase):
         # If not, the save() call in apply_rule_actions might error or not set it.
         # The previous model update step should have added this.
         rule_actions = [{'action_type': 'categorize', 'account_id': str(self.expense_account.id)}]
-        rule = ReconciliationRule.objects.create(actions=rule_actions, name='Test Categorize Rule', organization=self.organization, conditions=[{'field':'name', 'operator':'contains', 'value':'Misc'}])
+        rule = ReconciliationRule.objects.create(actions=rule_actions, name='Test Categorize Rule', organization=self.organization, conditions=[{'field': 'name', 'operator': 'contains', 'value': 'Misc'}])
 
         apply_rule_actions(staged_tx, rule, self.user)
         staged_tx.refresh_from_db()
@@ -73,7 +73,6 @@ class ReconciliationServiceTests(TestCase):
         self.assertEqual(staged_tx.reconciliation_status, StagedBankTransaction.RECON_RULE_APPLIED)
         self.assertEqual(staged_tx.applied_rule, rule)
         mock_account_get.assert_called_once_with(id=str(self.expense_account.id), organization=self.organization)
-
 
     def test_run_reconciliation_rules_for_organization(self):
         StagedBankTransaction.objects.create(organization=self.organization, date=date.today(), name='Starbucks Coffee', amount=Decimal('-5.00'), transaction_id_source='unmatched1', reconciliation_status=StagedBankTransaction.RECON_UNMATCHED)
@@ -107,9 +106,8 @@ class ReconciliationAPITests(APITestCase):
         self.organization = Organization.objects.create(name='Recon API Org')
         # Role.objects.create_default_roles_for_organization(self.organization) # Assuming this helper exists
         self.admin_role = Role.objects.filter(name='Admin').first()
-        if not self.admin_role: # Create a simple Admin role if not present from migrations or default creation
-             self.admin_role = Role.objects.create(name='Admin', description='Default Admin Role')
-
+        if not self.admin_role:  # Create a simple Admin role if not present from migrations or default creation
+            self.admin_role = Role.objects.create(name='Admin', description='Default Admin Role')
 
         Membership.objects.create(user=self.user, organization=self.organization, role=self.admin_role)
         self.client.login(email='reconapi@example.com', password='password123')
@@ -118,13 +116,12 @@ class ReconciliationAPITests(APITestCase):
         self.apply_rules_url = reverse('apply-recon-rules')
         self.staged_tx_list_url = reverse('staged-bank-transaction-list')
 
-
     def test_create_and_list_reconciliation_rule(self):
         # Need an account for the action part
         expense_acc = Account.objects.create(organization=self.organization, name='API Test Expense', type=Account.EXPENSE)
         rule_data = {
             'name': 'Test Rule API',
-            'conditions': [{'field': 'name', 'operator': 'contains', 'value': 'API Test'}], # Changed 'description' to 'name' for StagedTx
+            'conditions': [{'field': 'name', 'operator': 'contains', 'value': 'API Test'}],  # Changed 'description' to 'name' for StagedTx
             'actions': [{'action_type': 'categorize', 'account_id': str(expense_acc.id)}],
             'priority': 10,
             'is_active': True

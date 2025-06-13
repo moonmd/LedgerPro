@@ -1,10 +1,10 @@
 import logging
-from .models import Account, Organization # Removed unused Transaction, JournalEntry here for now
-from django.db.models import Sum # Added Sum import
+from .models import Account, Organization  # Removed unused Transaction, JournalEntry here for now
 from decimal import Decimal
-from datetime import date, timedelta # Added timedelta
+from datetime import date  # Added timedelta, Sum removed as unused
 
 logger = logging.getLogger(__name__)
+
 
 def get_profit_and_loss_data(organization: Organization, date_from: date, date_to: date):
     '''
@@ -37,7 +37,7 @@ def get_profit_and_loss_data(organization: Organization, date_from: date, date_t
         # otherwise using the direct query logic as fallback.
         # Assuming get_period_activity is now part of Account model.
         period_activity = acc.get_period_activity(date_from, date_to)
-        if period_activity != Decimal('0.00'): # Only include accounts with activity
+        if period_activity != Decimal('0.00'):  # Only include accounts with activity
             revenues_breakdown.append({'account_name': acc.name, 'amount': period_activity})
         total_revenue += period_activity
 
@@ -125,12 +125,12 @@ def get_balance_sheet_data(organization: Organization, as_of_date: date):
 
     # Add calculated current year net income to equity breakdown
     if current_year_net_income != Decimal('0.00') or not any(e['account_name'] == 'Current Year Net Income (Calculated)' for e in equity_breakdown):
-         equity_breakdown.append({'account_name': 'Current Year Net Income (Calculated)', 'balance': current_year_net_income})
+        equity_breakdown.append({'account_name': 'Current Year Net Income (Calculated)', 'balance': current_year_net_income})
 
     total_equity_calculated = total_explicit_equity + current_year_net_income
 
     verification_difference = total_assets - (total_liabilities + total_equity_calculated)
-    if abs(verification_difference) > Decimal('0.01'): # Allow for small rounding differences
+    if abs(verification_difference) > Decimal('0.01'):  # Allow for small rounding differences
         logger.warning(
             f'Balance Sheet for {organization.name} as of {as_of_date} may not balance: '
             f'Assets ({total_assets}) != Liabilities ({total_liabilities}) + Equity ({total_equity_calculated}). '
@@ -154,7 +154,7 @@ def get_balance_sheet_data(organization: Organization, as_of_date: date):
             'breakdown': equity_breakdown,
         },
         'verification': {
-            'assets_equals_liabilities_plus_equity': abs(verification_difference) <= Decimal('0.01'), # Check with tolerance
+            'assets_equals_liabilities_plus_equity': abs(verification_difference) <= Decimal('0.01'),  # Check with tolerance
             'difference': verification_difference
         }
     }
