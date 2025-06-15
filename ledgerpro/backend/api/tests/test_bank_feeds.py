@@ -119,7 +119,6 @@ class BankFeedsAPITests(APITestCase):
         self.assertEqual(plaid_item.access_token, 'mock_access_token')
         self.assertEqual(plaid_item.institution_name, 'Mock Bank')
 
-
     @mock.patch('ledgerpro.backend.api.plaid_service.get_plaid_client')
     @mock.patch('django.utils.timezone.now')
     def test_fetch_plaid_transactions(self, mock_timezone_now, mock_get_plaid_client):

@@ -362,6 +362,7 @@ class StagedBankTransactionSerializer(serializers.ModelSerializer):
     linked_transaction = TransactionSerializer(read_only=True, allow_null=True)
     applied_rule = ReconciliationRuleSerializer(read_only=True, allow_null=True)
     suggested_matches = serializers.JSONField(read_only=True, allow_null=True)
+
     class Meta:
         model = StagedBankTransaction
         fields = [

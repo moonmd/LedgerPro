@@ -5,7 +5,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_or_create_default_account(organization: Organization, account_type: str, account_name_substring: str, default_name: str, default_description_suffix: str = 'account'):
+def get_or_create_default_account(
+    organization: Organization,
+    account_type: str,
+    account_name_substring: str,
+    default_name: str,
+    default_description_suffix: str = 'account'
+):
     '''
     Helper function to find an account by a name substring or create a default one.
     If multiple accounts match the substring, logs a warning and returns the first one found by exact default_name, then by substring.
