@@ -48,6 +48,7 @@ class CustomUserManager(BaseUserManager):
 
         return self.create_user(email, password, **extra_fields)
 
+
 class User(AbstractUser):
     username = None
     email = models.EmailField(unique=True)
@@ -258,6 +259,7 @@ class Invoice(models.Model):
         self.subtotal = sum(item.amount for item in items if item.amount is not None)
         self.total_tax = sum(item.tax_amount for item in items if item.tax_amount is not None)
         self.total_amount = self.subtotal + self.total_tax
+
 
 class InvoiceItem(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

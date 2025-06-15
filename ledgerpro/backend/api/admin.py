@@ -4,7 +4,8 @@ from .models import (
     Account, Transaction, JournalEntry, AuditLog,
     Customer, Invoice, InvoiceItem, Vendor,
     PlaidItem, StagedBankTransaction, ReconciliationRule,
-    Employee, PayRun, Payslip, DeductionType, PayslipDeduction  # Added Payroll models
+    Employee, PayRun, Payslip, DeductionType,
+    PayslipDeduction  # Added Payroll models
 )
 
 admin.site.register(Organization)
