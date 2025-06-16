@@ -4,7 +4,7 @@ from rest_framework.test import APITestCase
 from decimal import Decimal
 from unittest import mock  # For mocking email sending
 
-from ledgerpro.backend.api.models import (
+from api.models import (
     User, Organization, Role, Membership, Customer, Invoice, Account  # InvoiceItem removed F401
 )
 
@@ -100,7 +100,7 @@ class InvoicingAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 2)
 
-    @mock.patch('ledgerpro.backend.api.email_utils.send_invoice_email')
+    @mock.patch('api.email_utils.send_invoice_email')
     def test_send_invoice_email_action(self, mock_send_invoice_email):
         mock_send_invoice_email.return_value = True
 
@@ -120,7 +120,7 @@ class InvoicingAPITests(APITestCase):
         self.assertEqual(invoice.status, Invoice.SENT)
         mock_send_invoice_email.assert_called_once_with(invoice)
 
-    @mock.patch('ledgerpro.backend.api.email_utils.send_invoice_email')
+    @mock.patch('api.email_utils.send_invoice_email')
     def test_send_invoice_email_failure(self, mock_send_invoice_email):
         mock_send_invoice_email.return_value = False
 

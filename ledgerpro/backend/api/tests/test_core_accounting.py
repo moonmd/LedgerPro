@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.core.exceptions import ValidationError
 from decimal import Decimal
 from datetime import date  # timedelta removed (F401)
-from ledgerpro.backend.api.models import Organization, Account, Transaction, JournalEntry, User
+from api.models import Organization, Account, Transaction, JournalEntry, User
 
 
 class CoreAccountingModelTests(TestCase):

@@ -1,0 +1,8 @@
+Name                          Version ID                  Fix Versions
+----------------------------- ------- ------------------- ------------
+djangorestframework-simplejwt 5.3.1   GHSA-5vcc-86wm-547q
+Name                Skip Reason
+------------------- ---------------------------------------------------------------------------------
+distro-info         Dependency not found on PyPI and could not be audited: distro-info (1.7+build1)
+python-apt          Dependency not found on PyPI and could not be audited: python-apt (2.7.7+ubuntu4)
+unattended-upgrades Dependency not found on PyPI and could not be audited: unattended-upgrades (0.1)

@@ -6,11 +6,11 @@ from decimal import Decimal
 from datetime import date
 import io  # For creating in-memory file for CSV upload
 
-from ledgerpro.backend.api.models import (
+from api.models import (
     User, Organization, Role, Membership, PlaidItem, StagedBankTransaction
 )
 # Assuming plaid_service.get_plaid_client can be mocked if not already done by other tests
-# from ledgerpro.backend.api.plaid_service import get_plaid_client  # Not strictly needed if mocking at service call level
+# from api.plaid_service import get_plaid_client  # Not strictly needed if mocking at service call level
 
 
 # Mock Plaid API client responses
@@ -89,7 +89,7 @@ class BankFeedsAPITests(APITestCase):
         self.fetch_transactions_url = reverse('plaid-fetch-transactions')
         self.manual_import_url = reverse('manual-bank-statement-import')
 
-    @mock.patch('ledgerpro.backend.api.plaid_service.get_plaid_client')
+    @mock.patch('api.plaid_service.get_plaid_client')
     def test_create_plaid_link_token(self, mock_get_plaid_client):
         mock_plaid_api_instance = mock_get_plaid_client.return_value
         # The service expects the response to be a dict, so to_dict() is good.
@@ -100,7 +100,7 @@ class BankFeedsAPITests(APITestCase):
         self.assertEqual(response.data['link_token'], 'mock_link_token_123')
         mock_plaid_api_instance.link_token_create.assert_called_once()
 
-    @mock.patch('ledgerpro.backend.api.plaid_service.get_plaid_client')
+    @mock.patch('api.plaid_service.get_plaid_client')
     def test_exchange_public_token(self, mock_get_plaid_client):
         mock_plaid_api_instance = mock_get_plaid_client.return_value
         mock_plaid_api_instance.item_public_token_exchange.return_value = MockPlaidItemPublicTokenExchangeResponse(
@@ -119,7 +119,7 @@ class BankFeedsAPITests(APITestCase):
         self.assertEqual(plaid_item.access_token, 'mock_access_token')
         self.assertEqual(plaid_item.institution_name, 'Mock Bank')
 
-    @mock.patch('ledgerpro.backend.api.plaid_service.get_plaid_client')
+    @mock.patch('api.plaid_service.get_plaid_client')
     @mock.patch('django.utils.timezone.now')
     def test_fetch_plaid_transactions(self, mock_timezone_now, mock_get_plaid_client):
         # Mock timezone.now() to return a fixed, non-naive datetime object

@@ -1,0 +1,10 @@
+Name                          Version ID                  Fix Versions
+----------------------------- ------- ------------------- -------------------
+django                        5.0.14  GHSA-7xr5-9hcq-chf9 4.2.22,5.1.10,5.2.2
+djangorestframework-simplejwt 5.3.1   GHSA-5vcc-86wm-547q
+gunicorn                      22.0.0  GHSA-hc5x-x2vx-497g 23.0.0
+Name                Skip Reason
+------------------- ---------------------------------------------------------------------------------
+distro-info         Dependency not found on PyPI and could not be audited: distro-info (1.7+build1)
+python-apt          Dependency not found on PyPI and could not be audited: python-apt (2.7.7+ubuntu4)
+unattended-upgrades Dependency not found on PyPI and could not be audited: unattended-upgrades (0.1)
