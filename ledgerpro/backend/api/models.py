@@ -17,6 +17,15 @@ class Organization(models.Model):
     def __str__(self):
         return self.name
 
+    class Meta:
+        app_label = 'api'
+
+    class Meta:
+        app_label = 'api'
+
+    class Meta:
+        app_label = 'api'
+
 
 class Role(models.Model):
     # Predefined roles, e.g., Admin, Accountant, Sales Manager, ReadOnly
@@ -65,6 +74,9 @@ class User(AbstractUser):
     def __str__(self):
         return self.email
 
+    class Meta:
+        app_label = 'api'
+
 
 class Membership(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -74,6 +86,7 @@ class Membership(models.Model):
 
     class Meta:
         unique_together = ('user', 'organization')
+        app_label = 'api'
 
     def __str__(self):
         return f'{self.user.email} in {self.organization.name} as {self.role.name if self.role else "No Role"}'
@@ -100,6 +113,7 @@ class Account(models.Model):
 
     class Meta:
         unique_together = ('organization', 'name', 'type')
+        app_label = 'api'
 
     def __str__(self):
         return f'{self.name} ({self.get_type_display()})'
@@ -162,6 +176,9 @@ class Transaction(models.Model):
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
 
+    class Meta:
+        app_label = 'api'
+
 
 class JournalEntry(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -173,6 +190,7 @@ class JournalEntry(models.Model):
 
     class Meta:
         verbose_name_plural = 'Journal Entries'
+        app_label = 'api'
 
     def __str__(self):
         if self.debit_amount > 0:
@@ -203,6 +221,9 @@ class AuditLog(models.Model):
     def __str__(self):
         return f'{self.action} by {self.user.email if self.user else "System"} at {self.timestamp}'
 
+    class Meta:
+        app_label = 'api'
+
 
 class Customer(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -216,6 +237,7 @@ class Customer(models.Model):
     class Meta:
         unique_together = ('organization', 'name')
         ordering = ['name']
+        app_label = 'api'
 
     def __str__(self):
         return self.name
@@ -250,6 +272,7 @@ class Invoice(models.Model):
     class Meta:
         unique_together = ('organization', 'invoice_number')
         ordering = ['-issue_date', '-invoice_number']
+        app_label = 'api'
 
     def __str__(self):
         return f'Invoice {self.invoice_number} for {self.customer.name}'
@@ -278,6 +301,9 @@ class InvoiceItem(models.Model):
     def __str__(self):
         return f'{self.description} (Qty: {self.quantity})'
 
+    class Meta:
+        app_label = 'api'
+
 
 class Vendor(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -291,6 +317,7 @@ class Vendor(models.Model):
     class Meta:
         unique_together = ('organization', 'name')
         ordering = ['name']
+        app_label = 'api'
 
     def __str__(self):
         return self.name
@@ -311,6 +338,9 @@ class PlaidItem(models.Model):
 
     def __str__(self):
         return f'{self.institution_name} for {self.organization.name} (Item ID: {self.item_id})'
+
+    class Meta:
+        app_label = 'api'
 
 
 class StagedBankTransaction(models.Model):
@@ -349,6 +379,7 @@ class StagedBankTransaction(models.Model):
     class Meta:
         ordering = ['-date', '-imported_at']
         unique_together = ('organization', 'transaction_id_source')
+        app_label = 'api'
 
     def __str__(self):
         return f'{self.name} ({self.amount} {self.currency_code}) on {self.date}'
@@ -368,6 +399,7 @@ class ReconciliationRule(models.Model):
 
     class Meta:
         ordering = ['organization', 'priority', 'name']
+        app_label = 'api'
 
     def __str__(self):
         return f'{self.name} for {self.organization.name}'
@@ -404,6 +436,7 @@ class Employee(models.Model):
     class Meta:
         unique_together = ('organization', 'email')
         ordering = ['organization', 'last_name', 'first_name']
+        app_label = 'api'
 
     def __str__(self):
         return f'{self.first_name} {self.last_name} ({self.organization.name})'
@@ -436,6 +469,7 @@ class PayRun(models.Model):
 
     class Meta:
         ordering = ['organization', '-payment_date']
+        app_label = 'api'
 
     def __str__(self):
         return f'PayRun for {self.organization.name} ({self.pay_period_start_date} to {self.pay_period_end_date})'
@@ -456,6 +490,7 @@ class DeductionType(models.Model):
 
     class Meta:
         unique_together = ('organization', 'name')
+        app_label = 'api'
 
     def __str__(self):
         return f'{self.name} ({self.get_tax_treatment_display()})'
@@ -479,6 +514,7 @@ class Payslip(models.Model):
     class Meta:
         unique_together = ('pay_run', 'employee')
         ordering = ['pay_run', 'employee__last_name']
+        app_label = 'api'
 
     def __str__(self):
         return f'Payslip for {self.employee} - PayRun {self.pay_run.id}'
@@ -492,3 +528,6 @@ class PayslipDeduction(models.Model):
 
     def __str__(self):
         return f'{self.deduction_type.name}: {self.amount} for {self.payslip.employee}'
+
+    class Meta:
+        app_label = 'api'
