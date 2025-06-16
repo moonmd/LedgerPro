@@ -6,10 +6,10 @@ from unittest import mock
 from decimal import Decimal
 from datetime import date
 
-from ledgerpro.backend.api.models import (
+from api.models import (
     User, Organization, Role, Membership, Account, StagedBankTransaction, ReconciliationRule  # Transaction removed F401
 )
-from ledgerpro.backend.api.reconciliation_service import (
+from api.reconciliation_service import (
     evaluate_condition, check_rule_conditions, apply_rule_actions, run_reconciliation_rules_for_organization
 )
 
@@ -52,7 +52,7 @@ class ReconciliationServiceTests(TestCase):
         rule_no_match_amount = ReconciliationRule(conditions=rule_conditions_no_match_amount, name="No Match Amount", organization=self.organization)
         self.assertFalse(check_rule_conditions(staged_tx, rule_no_match_amount))
 
-    @mock.patch('ledgerpro.backend.api.reconciliation_service.Account.objects.get')
+    @mock.patch('api.reconciliation_service.Account.objects.get')
     def test_apply_rule_actions_categorize(self, mock_account_get):
         mock_account_get.return_value = self.expense_account
 
@@ -134,7 +134,7 @@ class ReconciliationAPITests(APITestCase):
         self.assertEqual(len(response_list.data), 1)
         self.assertEqual(response_list.data[0]['name'], 'Test Rule API')
 
-    @mock.patch('ledgerpro.backend.api.reconciliation_service.run_reconciliation_rules_for_organization')
+    @mock.patch('api.reconciliation_service.run_reconciliation_rules_for_organization')
     def test_apply_reconciliation_rules_api(self, mock_run_rules):
         mock_run_rules.return_value = 5
         response = self.client.post(self.apply_rules_url)

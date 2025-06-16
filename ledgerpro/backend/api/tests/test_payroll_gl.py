@@ -1,8 +1,8 @@
 from decimal import Decimal
-from ledgerpro.backend.api.models import (
+from api.models import (
     User, Organization, Role, Membership, Account, Employee, DeductionType, PayRun, Transaction, JournalEntry, Payslip
 )
-from ledgerpro.backend.api.payroll_service import process_pay_run, calculate_gross_pay  # For direct service testing
+from api.payroll_service import process_pay_run, calculate_gross_pay  # For direct service testing
 from datetime import date  # Added for date objects in new tests
 from django.test import TestCase  # Moved APITestCase to TestCase as no API calls are made directly here for now
 # from unittest import mock # For mocking, if needed for service calls - F401 unused

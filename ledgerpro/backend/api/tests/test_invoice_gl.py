@@ -2,7 +2,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 from decimal import Decimal
-from ledgerpro.backend.api.models import (
+from api.models import (
     User, Organization, Role, Membership, Account, Customer, Invoice, Transaction, JournalEntry  # InvoiceItem removed F401
 )
 # Assuming UserDetailSerializer is available for request.user if needed, or mock authentication
