@@ -32,7 +32,7 @@ distro-info==1.7+build1
 Django==5.2.2
 django-cors-headers==4.3.1
 djangorestframework==3.15.2
-djangorestframework-simplejwt==5.3.1
+djangorestframework-simplejwt==5.5.0
 dulwich==0.22.8
 ecdsa==0.19.1
 exceptiongroup==1.2.2
