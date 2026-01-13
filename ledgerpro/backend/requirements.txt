@@ -37,7 +37,7 @@ dulwich==0.22.8
 ecdsa==0.19.1
 exceptiongroup==1.2.2
 fastjsonschema==2.21.1
-filelock==3.18.0
+filelock==3.20.3
 findpython==0.6.3
 gunicorn==23.0.0
 gyp==0.1
